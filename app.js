@@ -6,14 +6,7 @@ const jwt = require('jsonwebtoken');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
-const moment = require('moment');
-const fs = require('fs').promises;
-const csv = require('csv-parser');
-const XLSX = require('xlsx');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const multer = require('multer');
-const fetch = require('node-fetch');
 const path = require('path');
 
 
@@ -257,6 +250,53 @@ app.post('/api/decodeToken', async(req, res) => {
 
 
 
+
+// Route for login
+app.post('/api/login', async(req, res) => {
+    const { roll_no, password } = req.body;
+
+    try {
+        console.log('API login requested');
+        console.log('Roll Number:', roll_no);
+
+        // Query the database to check if the provided roll number exists
+        const [existingUser] = await pool.execute('SELECT * FROM login WHERE roll_no = ?', [roll_no]);
+
+        if (existingUser.length === 0) {
+            // If the roll number doesn't exist, return an error
+            console.log("No user found");
+            return res.status(400).json({ error: 'Invalid roll number' });
+        }
+
+        // Verify the password
+        const isPasswordValid = await bcrypt.compare(password, existingUser[0].password);
+
+        if (!isPasswordValid) {
+            // If the password is incorrect, return an error
+            console.log("Invalid password");
+            return res.status(400).json({ error: 'Invalid password' });
+        }
+
+        // Check if the user is active
+        const isActive = existingUser[0].is_active;
+
+        if (isActive === 0) {
+            // If the user is not active, return a message
+            console.log("User is no longer active");
+            return res.status(400).json({ error: 'You are no longer an active user' });
+        }
+
+        // Call function to create token
+        const token = createtoken(req, res, existingUser);
+        console.log("Token:", token);
+
+        // Send response
+        res.json({ isValid: true, token });
+    } catch (error) {
+        console.error('Error during login:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 
