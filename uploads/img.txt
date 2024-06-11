@@ -1,0 +1,2 @@
+image will store in this location
+data path is stored in DB
