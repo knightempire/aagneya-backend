@@ -6,11 +6,7 @@ This repository contains the backend code for the Aagenya Sports Club, developed
 
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Database Setup](#database-setup)
-- [Running the Application](#running-the-application)
-- [API Documentation](#api-documentation)
-- [Contributing](#contributing)
-- [License](#license)
+
 
 ## Installation
 
