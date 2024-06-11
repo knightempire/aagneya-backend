@@ -301,6 +301,43 @@ app.post('/api/login', async(req, res) => {
 
 
 
+
+// Route for user registration
+app.post('/api/register', async(req, res) => {
+    const { roll_no, date, role_id, sport_id } = req.body;
+
+    try {
+        console.log('API registration requested');
+        console.log('Roll Number:', roll_no);
+
+        // Set password to roll_no
+        const password = roll_no;
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Insert new user into the login table
+        const loginResult = await pool.execute('INSERT INTO login (roll_no, password, is_active, date, role_id) VALUES (?, ?, ?, ?, ?)', [roll_no, hashedPassword, 0, date, role_id]);
+
+        // Insert sport_id into the profile table
+        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id) VALUES (?, ?)', [roll_no, sport_id]);
+
+        // Send response
+        res.json({ success: true, message: 'User registered successfully' });
+    } catch (error) {
+        console.error('Error during registration:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+
+
+
+
+
+
 // API endpoint for uploading an image
 app.post('/upload', upload.single('image'), async(req, res) => {
     try {
