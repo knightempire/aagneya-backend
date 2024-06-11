@@ -29,7 +29,7 @@ app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-
+require('dotenv').config();
 const {
     DB_HOST,
     DB_USER,
