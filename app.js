@@ -250,7 +250,6 @@ app.post('/api/decodeToken', async(req, res) => {
 
 
 
-
 // Route for login
 app.post('/api/login', async(req, res) => {
     const { roll_no, password } = req.body;
@@ -305,7 +304,6 @@ app.post('/api/login', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-
 
 
 
@@ -383,21 +381,26 @@ app.post('/api/addsports', async(req, res) => {
 
 // Route for adding security information
 app.post('/api/addsecurity', async(req, res) => {
-    const { roll_no, dob, city_born, school, fav_friend } = req.body;
+    let { roll_no, dob, hospital_born, school, fav_friend } = req.body;
+
+    // Convert roll_no, hospital_born, school, and fav_friend to lowercase
+    roll_no = roll_no.toLowerCase();
+    hospital_born = hospital_born.toLowerCase();
+    school = school.toLowerCase();
+    fav_friend = fav_friend.toLowerCase();
 
     try {
         console.log('API addsecurity requested');
 
-
         // Check if the roll_no already exists in the database
-        const [existingEntry] = await pool.execute('SELECT * FROM qa WHERE roll_no = ?', [roll_no]);
+        const [existingEntry] = await pool.execute('SELECT * FROM qa WHERE LOWER(roll_no) = ?', [roll_no]);
 
         if (existingEntry.length > 0) {
             return res.status(400).json({ error: 'Security information for this roll number already exists' });
         }
 
         // Insert new security information into the qa table
-        const result = await pool.execute('INSERT INTO qa (roll_no, dob, city_born, school, fav_friend) VALUES (?, ?, ?, ?, ?)', [roll_no, dob, city_born, school, fav_friend]);
+        const result = await pool.execute('INSERT INTO qa (roll_no, dob, hospital_born, school, fav_friend) VALUES (?, ?, ?, ?, ?)', [roll_no, dob, hospital_born, school, fav_friend]);
 
         // Send response
         res.json({ success: true, message: 'Security information added successfully' });
@@ -410,9 +413,12 @@ app.post('/api/addsecurity', async(req, res) => {
 
 // API endpoint for adding a profile
 app.post('/addprofile', upload.single('photo'), async(req, res) => {
-    try {
-        const { roll_no, name, email, sport_id } = req.body;
+    let { roll_no, name, email, sport_id } = req.body;
 
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
         console.log('API add profile requested');
 
         if (!req.file) {
@@ -441,15 +447,17 @@ app.post('/addprofile', upload.single('photo'), async(req, res) => {
 
 // API endpoint for resetting password
 app.post('/resetpassword', async(req, res) => {
-    try {
-        // Extract roll_no and new_password from request body
-        const { roll_no, new_password } = req.body;
+    let { roll_no, new_password } = req.body;
 
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
         // Log API request
         console.log('API resetpassword requested');
 
         // Check if the roll number exists in the login table
-        const [existingUser] = await pool.execute('SELECT * FROM login WHERE roll_no = ?', [roll_no]);
+        const [existingUser] = await pool.execute('SELECT * FROM login WHERE LOWER(roll_no) = ?', [roll_no]);
 
         // If roll number doesn't exist, return error
         if (existingUser.length === 0) {
@@ -457,7 +465,7 @@ app.post('/resetpassword', async(req, res) => {
         }
 
         // Update password for the user with provided roll number
-        const updateQuery = 'UPDATE login SET password = ? WHERE roll_no = ?';
+        const updateQuery = 'UPDATE login SET password = ? WHERE LOWER(roll_no) = ?';
         await pool.execute(updateQuery, [new_password, roll_no]);
 
         // Send response
@@ -471,6 +479,93 @@ app.post('/resetpassword', async(req, res) => {
 
 
 
+
+// API endpoint for deactivating a user
+app.post('/api/deactivateuser', async(req, res) => {
+    let { roll_no } = req.body;
+
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API deactivateuser requested');
+
+        // Update is_active to 0 for the user with the provided roll number
+        const updateQuery = 'UPDATE login SET is_active = 0 WHERE LOWER(roll_no) = ?';
+        const [updateResult] = await pool.execute(updateQuery, [roll_no]);
+
+        // Check if any rows were affected by the update
+        if (updateResult.affectedRows === 0) {
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'User deactivated successfully' });
+    } catch (error) {
+        console.error('Error deactivating user:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// API endpoint for changing a user's sport
+app.post('/api/changesport', async(req, res) => {
+    let { roll_no, sport_id } = req.body;
+
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API changesport requested');
+
+        // Update sport_id for the user with the provided roll number
+        const updateQuery = 'UPDATE profile SET sport_id = ? WHERE LOWER(roll_no) = ?';
+        const [updateResult] = await pool.execute(updateQuery, [sport_id, roll_no]);
+
+        // Check if any rows were affected by the update
+        if (updateResult.affectedRows === 0) {
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'User sport updated successfully' });
+    } catch (error) {
+        console.error('Error updating user sport:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for changing a user's role
+app.post('/api/changeroll', async(req, res) => {
+    let { roll_no, role_id } = req.body;
+
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API changeroll requested');
+
+        // Update role_id for the user with the provided roll number
+        const updateQuery = 'UPDATE login SET role_id = ? WHERE LOWER(roll_no) = ?';
+        const [updateResult] = await pool.execute(updateQuery, [role_id, roll_no]);
+
+        // Check if any rows were affected by the update
+        if (updateResult.affectedRows === 0) {
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'User role updated successfully' });
+    } catch (error) {
+        console.error('Error updating user role:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 // API endpoint for uploading an image
