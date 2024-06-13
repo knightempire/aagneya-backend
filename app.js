@@ -413,10 +413,11 @@ app.post('/api/addsecurity', async(req, res) => {
 
 // API endpoint for adding a profile
 app.post('/addprofile', upload.single('photo'), async(req, res) => {
-    let { roll_no, name, email, sport_id } = req.body;
+    let { roll_no, name, email, sport_id, phone } = req.body;
 
-    // Convert roll_no to lowercase
+    // Convert roll_no and phone to lowercase
     roll_no = roll_no.toLowerCase();
+
 
     try {
         console.log('API add profile requested');
@@ -426,8 +427,8 @@ app.post('/addprofile', upload.single('photo'), async(req, res) => {
         }
 
         // Inserting data into the profile table
-        const insertQuery = `INSERT INTO profile (roll_no, name, photo_path, email, sport_id) VALUES (?, ?, ?, ?, ?)`;
-        connection.query(insertQuery, [roll_no, name, req.file.path, email, sport_id], (error, results, fields) => {
+        const insertQuery = `INSERT INTO profile (roll_no, name, photo_path, email, sport_id, phone) VALUES (?, ?, ?, ?, ?, ?)`;
+        connection.query(insertQuery, [roll_no, name, req.file.path, email, sport_id, phone], (error, results, fields) => {
             if (error) {
                 console.error("Error inserting data: ", error);
                 res.status(500).json({ error: "Error inserting data into the database" });
@@ -443,6 +444,57 @@ app.post('/addprofile', upload.single('photo'), async(req, res) => {
 });
 
 
+// API endpoint for verifying security question answer
+app.post('/api/verifysecurity', async(req, res) => {
+    const { roll_no, qa_id, qa_answer } = req.body;
+
+    // Convert roll_no to lowercase
+    const lowercaseRollNo = roll_no.toLowerCase();
+
+    try {
+        console.log('API verifysecurity requested');
+
+        let columnToCheck;
+
+        // Determine the column to check based on qa_id
+        switch (qa_id) {
+            case 1:
+                columnToCheck = 'hospital_born';
+                break;
+            case 2:
+                columnToCheck = 'school';
+                break;
+            case 3:
+                columnToCheck = 'fav_friend';
+                break;
+            default:
+                return res.status(400).json({ error: 'Invalid security question ID' });
+        }
+
+        // Fetch the correct answer from the qa table based on roll_no
+        const [securityInfo] = await pool.execute(`SELECT ${columnToCheck} FROM qa WHERE LOWER(roll_no) = ?`, [lowercaseRollNo]);
+
+        // Check if the security information exists for the provided roll_no
+        if (securityInfo.length === 0) {
+            return res.status(404).json({ error: 'Security information not found' });
+        }
+
+        // Extract the correct answer from the fetched security information
+        const correctAnswer = securityInfo[0][columnToCheck];
+
+        // Compare the provided answer with the correct answer
+        if (correctAnswer.toLowerCase() === qa_answer.toLowerCase()) {
+            // If the answers match, send success response
+            return res.json({ success: true, message: 'Security question answer is correct' });
+        } else {
+            // If the answers don't match, send error response
+            return res.status(400).json({ error: 'Security question answer is incorrect' });
+        }
+    } catch (error) {
+        console.error('Error verifying security question answer:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 // API endpoint for resetting password
@@ -478,6 +530,37 @@ app.post('/resetpassword', async(req, res) => {
 });
 
 
+// API endpoint for hard resetting password
+app.post('/api/hardresetpassword', async(req, res) => {
+    const { roll_no } = req.body;
+
+    try {
+        console.log('API hardresetpassword requested');
+
+        // Set password to roll_no
+        const password = roll_no;
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Update the password for the user with the provided roll number
+        const updateQuery = 'UPDATE login SET password = ? WHERE roll_no = ?';
+        const [updateResult] = await pool.execute(updateQuery, [hashedPassword, roll_no]);
+
+        // Check if any rows were affected by the update
+        if (updateResult.affectedRows === 0) {
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Password reset successfully' });
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 
 
 // API endpoint for deactivating a user
@@ -507,6 +590,7 @@ app.post('/api/deactivateuser', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 
 
 // API endpoint for changing a user's sport
@@ -566,6 +650,336 @@ app.post('/api/changeroll', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+
+
+// API endpoint for updating profile year and concatenating new year with existing one
+app.post('/api/nextyear', async(req, res) => {
+    let { roll_no, year } = req.body;
+
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API nextyear requested');
+
+        // Retrieve existing year for the user with the provided roll number
+        const [existingYear] = await pool.execute('SELECT year FROM profile WHERE LOWER(roll_no) = ?', [roll_no]);
+
+        let newYear;
+        if (existingYear.length > 0) {
+            // Concatenate new year with existing one if it exists
+            newYear = existingYear[0].year ? `${existingYear[0].year},${year}` : year;
+
+            // Update profile year for the user with the provided roll number
+            const updateQuery = 'UPDATE profile SET year = ? WHERE LOWER(roll_no) = ?';
+            await pool.execute(updateQuery, [newYear, roll_no]);
+        } else {
+            // If the user doesn't exist, return an error
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Year updated successfully' });
+    } catch (error) {
+        console.error('Error updating year:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for adding an event
+app.post('/api/addevent', async(req, res) => {
+    let { event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date } = req.body;
+
+    // Convert event_name, event_description, place, and roll_no (created_by) to lowercase
+    event_name = event_name.toLowerCase();
+    event_description = event_description.toLowerCase();
+    place = place.toLowerCase();
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API addevent requested');
+
+        // Insert new event into the events table with provided created_date
+        const insertQuery = `INSERT INTO events (event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await pool.execute(insertQuery, [event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date, 0]);
+
+        // Send response
+        res.json({ success: true, message: 'Event added successfully' });
+    } catch (error) {
+        console.error('Error adding event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for event approval
+app.post('/api/eventapproval', async(req, res) => {
+    const { event_id, approval_date } = req.body;
+
+    try {
+        console.log('API eventapproval requested');
+
+        // Set approval_status to 1 and update approval_date
+        const updateQuery = `UPDATE events SET approval_status = ?, approval_date = ? WHERE event_id = ?`;
+        const result = await pool.execute(updateQuery, [1, approval_date, event_id]);
+
+        // Check if any rows were affected by the update
+        if (result[0].affectedRows === 0) {
+            console.log('Event not found');
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Event approval status updated successfully' });
+    } catch (error) {
+        console.error('Error updating event approval status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// API endpoint for adding an event by admin
+app.post('/api/adminaddevent', async(req, res) => {
+    // Convert certain fields to lowercase before destructuring
+    const { event_name, event_description, place, created_by, created_date, sport_id, date, time, entry_fee, is_team, no_of_prize, category, gender, form_link, last_date } = req.body;
+
+    try {
+        console.log('API adminaddevent requested');
+
+        // Insert new event into the events table with approval_status = 1
+        const insertQuery = `INSERT INTO events (event_name, sport_id, date, time, place, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await pool.execute(insertQuery, [event_name.toLowerCase(), sport_id, date, time, place.toLowerCase(), entry_fee, is_team, event_description.toLowerCase(), no_of_prize, category, gender, form_link, last_date, created_by.toLowerCase(), created_date, 1]);
+
+        // Send response
+        res.json({ success: true, message: 'Event added successfully' });
+    } catch (error) {
+        console.error('Error adding event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for displaying approved events
+app.get('/api/displayevent', async(req, res) => {
+    try {
+        console.log('API displayevent requested');
+
+        // Select events with approval_status = 1
+        const selectQuery = 'SELECT * FROM events WHERE approval_status = ?';
+        const [events] = await pool.execute(selectQuery, [1]);
+
+        // Send response with the retrieved events
+        res.json({ success: true, events });
+    } catch (error) {
+        console.error('Error displaying events:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for displaying filtered members
+app.post('/api/displaymembersfilter', async(req, res) => {
+    const { year, sport_id } = req.body;
+
+    try {
+        console.log('API displaymembersfilter requested');
+
+        let selectQuery = 'SELECT * FROM profile';
+
+        // Select roll_no from login table where role_id != 0
+        const [rollNos] = await pool.execute('SELECT roll_no FROM login WHERE role_id != 0');
+
+        // Check if roll numbers are retrieved
+        if (rollNos.length > 0) {
+            // Extract roll numbers from the result
+            const rollNumbers = rollNos.map(row => row.roll_no);
+
+            // Build the WHERE clause based on retrieved roll numbers
+            selectQuery += ` WHERE roll_no IN (${rollNumbers.map(() => '?').join(', ')})`;
+
+            // Add filter for sport_id if provided
+            if (sport_id) {
+                selectQuery += ' AND sport_id = ?';
+            }
+
+            // Add filter for year if provided
+            if (year) {
+                selectQuery += ' AND year = ?';
+            }
+
+            // Prepare filter parameters
+            let filterParams = rollNumbers;
+            if (sport_id && year) {
+                filterParams.push(sport_id, year);
+            } else if (sport_id) {
+                filterParams.push(sport_id);
+            } else if (year) {
+                filterParams.push(year);
+            }
+
+            // Execute the query with appropriate parameters
+            const [filteredMembers] = await pool.execute(selectQuery, filterParams);
+
+            // Send response with the filtered members
+            res.json({ success: true, filteredMembers });
+        } else {
+            // If no roll numbers are retrieved, send an empty response
+            res.json({ success: true, filteredMembers: [] });
+        }
+    } catch (error) {
+        console.error('Error displaying filtered members:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for retrieving events created by a user
+app.post('/api/createdevents', async(req, res) => {
+    const { roll_no } = req.body; // Get roll number from request body and convert to lowercase
+    const rollNoLower = roll_no.toLowerCase();
+
+    try {
+        console.log('API createdevents requested');
+
+        // Retrieve events created by the specified user from the profile table
+        const selectQuery = 'SELECT * FROM profile WHERE created_by = ?';
+        const [createdEvents] = await pool.execute(selectQuery, [rollNoLower]);
+
+        // Send response with the created events
+        res.json({ success: true, createdEvents });
+    } catch (error) {
+        console.error('Error retrieving created events:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for updating an event
+app.post('/api/updateevent', async(req, res) => {
+    const { event_id, event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place } = req.body;
+
+    try {
+        console.log('API updateevent requested');
+
+        const [eventRows] = await pool.execute('SELECT approval_status FROM events WHERE event_id = ?', [event_id]);
+
+        if (eventRows.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        const approvalStatus = eventRows[0].approval_status;
+        if (approvalStatus === 1) {
+            return res.status(403).json({ error: 'Event is already published and cannot be edited' });
+        }
+
+        // Update the event in the database
+        const updateQuery = `
+            UPDATE events 
+            SET 
+                event_name = ?, 
+                sport_id = ?, 
+                date = ?, 
+                time = ?, 
+                entry_fee = ?, 
+                is_team = ?, 
+                event_description = ?, 
+                no_of_prize = ?, 
+                category = ?, 
+                gender = ?, 
+                form_link = ?, 
+                last_date = ?, 
+                place = ? 
+            WHERE 
+                event_id = ?`;
+
+        await pool.execute(updateQuery, [
+            event_name,
+            sport_id,
+            date,
+            time,
+            entry_fee,
+            is_team,
+            event_description,
+            no_of_prize,
+            category,
+            gender,
+            form_link,
+            last_date,
+            place,
+            event_id
+        ]);
+
+        // Send success response
+        res.json({ success: true, message: 'Event updated successfully' });
+    } catch (error) {
+        console.error('Error updating event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// API endpoint for updating an event by admin
+app.post('/api/adminupdateevent', async(req, res) => {
+    const { event_id, event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place } = req.body;
+
+    try {
+        console.log('API adminupdateevent requested');
+
+        // Update the event in the database
+        const updateQuery = `
+            UPDATE events 
+            SET 
+                event_name = ?, 
+                sport_id = ?, 
+                date = ?, 
+                time = ?, 
+                entry_fee = ?, 
+                is_team = ?, 
+                event_description = ?, 
+                no_of_prize = ?, 
+                category = ?, 
+                gender = ?, 
+                form_link = ?, 
+                last_date = ?, 
+                place = ? 
+            WHERE 
+                event_id = ?`;
+
+        await pool.execute(updateQuery, [
+            event_name,
+            sport_id,
+            date,
+            time,
+            entry_fee,
+            is_team,
+            event_description,
+            no_of_prize,
+            category,
+            gender,
+            form_link,
+            last_date,
+            place,
+            event_id
+        ]);
+
+        // Send success response
+        res.json({ success: true, message: 'Event updated successfully' });
+    } catch (error) {
+        console.error('Error updating event by admin:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 
 
 // API endpoint for uploading an image
