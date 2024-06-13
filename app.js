@@ -165,7 +165,7 @@ const authenticateToken = async(req, res, next) => {
         console.log("Token:", token); // Print token value
 
         // Verify token
-        jwt.verify(token, "learn@1234", async(err, decodedToken) => {
+        jwt.verify(token, "aagenya@1234", async(err, decodedToken) => {
             if (err) {
                 console.error('Authentication error:', err.message);
                 // Token is invalid or expired, send 401 Unauthorized response to client
@@ -257,13 +257,12 @@ app.post('/api/login', async(req, res) => {
 
     try {
         console.log('API login requested');
-        console.log('Roll Number:', roll_no);
 
-        // Query the database to check if the provided roll number exists
+        // Query the database to check if the provided roll number exists in the login table
         const [existingUser] = await pool.execute('SELECT * FROM login WHERE roll_no = ?', [roll_no]);
 
         if (existingUser.length === 0) {
-            // If the roll number doesn't exist, return an error
+            // If the roll number doesn't exist in the login table, return an error
             console.log("No user found");
             return res.status(400).json({ error: 'Invalid roll number' });
         }
@@ -286,12 +285,21 @@ app.post('/api/login', async(req, res) => {
             return res.status(400).json({ error: 'You are no longer an active user' });
         }
 
+        // Check if the roll number exists in the profile table
+        const [existingProfile] = await pool.execute('SELECT * FROM profile WHERE roll_no = ?', [roll_no]);
+        let profileExists = 0;
+
+        if (existingProfile.length > 0) {
+            // If the roll number exists in the profile table, set profileExists to 1
+            profileExists = 1;
+        }
+
         // Call function to create token
         const token = createtoken(req, res, existingUser);
         console.log("Token:", token);
 
         // Send response
-        res.json({ isValid: true, token });
+        res.json({ isValid: true, profile: profileExists, token });
     } catch (error) {
         console.error('Error during login:', error);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -301,14 +309,21 @@ app.post('/api/login', async(req, res) => {
 
 
 
-
 // Route for user registration
 app.post('/api/register', async(req, res) => {
-    const { roll_no, date, role_id, sport_id } = req.body;
+    const { roll_no, date, role_id, sport_id, year } = req.body;
 
     try {
         console.log('API registration requested');
-        console.log('Roll Number:', roll_no);
+
+        // Check if the roll number already exists (case-insensitive check)
+        const [existingUser] = await pool.execute('SELECT * FROM login WHERE LOWER(roll_no) = LOWER(?)', [roll_no]);
+
+        // Check if any rows were returned
+        if (existingUser.length > 0) {
+            console.log('User with the same roll number already exists');
+            return res.status(400).json({ error: 'User with the same roll number already exists' });
+        }
 
         // Set password to roll_no
         const password = roll_no;
@@ -317,10 +332,10 @@ app.post('/api/register', async(req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Insert new user into the login table
-        const loginResult = await pool.execute('INSERT INTO login (roll_no, password, is_active, date, role_id) VALUES (?, ?, ?, ?, ?)', [roll_no, hashedPassword, 0, date, role_id]);
+        const loginResult = await pool.execute('INSERT INTO login (roll_no, password, is_active, date, role_id) VALUES (?, ?, ?, ?, ?)', [roll_no, hashedPassword, 1, date, role_id]);
 
-        // Insert sport_id into the profile table
-        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id) VALUES (?, ?)', [roll_no, sport_id]);
+        // Insert sport_id and year into the profile table
+        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id, year) VALUES (?, ?, ?)', [roll_no, sport_id, year]);
 
         // Send response
         res.json({ success: true, message: 'User registered successfully' });
@@ -333,6 +348,126 @@ app.post('/api/register', async(req, res) => {
 
 
 
+// Route for adding sports
+app.post('/api/addsports', async(req, res) => {
+    const { sport_name } = req.body;
+
+    try {
+        console.log('API addsports requested');
+
+        // Check if the sport already exists (case-insensitive)
+        const [existingSport] = await pool.execute('SELECT * FROM sports WHERE LOWER(sport_name) = LOWER(?)', [sport_name]);
+
+        if (existingSport.length > 0) {
+            return res.status(400).json({ error: 'Sport already exists' });
+        }
+
+        // Get the maximum sport_id from the database
+        const [maxSportId] = await pool.execute('SELECT MAX(sport_id) AS maxSportId FROM sports');
+
+        // Calculate the next sport_id
+        const nextSportId = maxSportId[0].maxSportId + 1;
+
+        // Insert new sport into the sports table with the calculated sport_id
+        const result = await pool.execute('INSERT INTO sports (sport_id, sport_name) VALUES (?, ?)', [nextSportId, sport_name]);
+
+        // Send response
+        res.json({ success: true, message: 'Sport added successfully' });
+    } catch (error) {
+        console.error('Error adding sport:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+})
+
+
+
+// Route for adding security information
+app.post('/api/addsecurity', async(req, res) => {
+    const { roll_no, dob, city_born, school, fav_friend } = req.body;
+
+    try {
+        console.log('API addsecurity requested');
+
+
+        // Check if the roll_no already exists in the database
+        const [existingEntry] = await pool.execute('SELECT * FROM qa WHERE roll_no = ?', [roll_no]);
+
+        if (existingEntry.length > 0) {
+            return res.status(400).json({ error: 'Security information for this roll number already exists' });
+        }
+
+        // Insert new security information into the qa table
+        const result = await pool.execute('INSERT INTO qa (roll_no, dob, city_born, school, fav_friend) VALUES (?, ?, ?, ?, ?)', [roll_no, dob, city_born, school, fav_friend]);
+
+        // Send response
+        res.json({ success: true, message: 'Security information added successfully' });
+    } catch (error) {
+        console.error('Error adding security information:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// API endpoint for adding a profile
+app.post('/addprofile', upload.single('photo'), async(req, res) => {
+    try {
+        const { roll_no, name, email, sport_id } = req.body;
+
+        console.log('API add profile requested');
+
+        if (!req.file) {
+            throw new Error('No photo uploaded.');
+        }
+
+        // Inserting data into the profile table
+        const insertQuery = `INSERT INTO profile (roll_no, name, photo_path, email, sport_id) VALUES (?, ?, ?, ?, ?)`;
+        connection.query(insertQuery, [roll_no, name, req.file.path, email, sport_id], (error, results, fields) => {
+            if (error) {
+                console.error("Error inserting data: ", error);
+                res.status(500).json({ error: "Error inserting data into the database" });
+            } else {
+                console.log("Data inserted successfully");
+                res.status(200).json({ success: true, message: "Profile added successfully" });
+            }
+        });
+    } catch (error) {
+        console.error("Error adding profile: ", error);
+        res.status(500).json({ error: "Error adding profile." });
+    }
+});
+
+
+
+
+// API endpoint for resetting password
+app.post('/resetpassword', async(req, res) => {
+    try {
+        // Extract roll_no and new_password from request body
+        const { roll_no, new_password } = req.body;
+
+        // Log API request
+        console.log('API resetpassword requested');
+
+        // Check if the roll number exists in the login table
+        const [existingUser] = await pool.execute('SELECT * FROM login WHERE roll_no = ?', [roll_no]);
+
+        // If roll number doesn't exist, return error
+        if (existingUser.length === 0) {
+            return res.status(400).json({ error: 'Invalid roll number' });
+        }
+
+        // Update password for the user with provided roll number
+        const updateQuery = 'UPDATE login SET password = ? WHERE roll_no = ?';
+        await pool.execute(updateQuery, [new_password, roll_no]);
+
+        // Send response
+        res.json({ success: true, message: 'Password reset successfully' });
+    } catch (error) {
+        // Handle errors
+        console.error('Error resetting password:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 
