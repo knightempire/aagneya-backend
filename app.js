@@ -1092,7 +1092,6 @@ app.get('/images', (req, res) => {
 });
 
 
-
 // Route for adding achievements
 app.post('/api/addachievement', async(req, res) => {
     const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
@@ -1210,10 +1209,7 @@ app.post('/api/adminupdateachievement', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-
-
-
-
+    
 
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
