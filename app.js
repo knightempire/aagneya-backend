@@ -1042,6 +1042,129 @@ app.post('/api/adminupdateevent', async(req, res) => {
 
 
 
+// Route for adding achievements
+app.post('/api/addachievement', async(req, res) => {
+    const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
+
+    try {
+        console.log('API addachievement requested');
+
+        // Insert new achievement into the achievements table
+        const insertQuery = `INSERT INTO achievements (description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await pool.execute(insertQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display]);
+
+        // Send response
+        res.json({ success: true, message: 'Achievement added successfully' });
+    } catch (error) {
+        console.error('Error adding achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route for updating achievements
+app.post('/api/updateachievement', async(req, res) => {
+    const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
+
+    try {
+        console.log('API updateachievement requested');
+
+        // Update the achievement in the database
+        const updateQuery = `UPDATE achievements SET description = ?, achievement_date = ?, roll_no = ?, name = ?, sport_id = ?, photo_path = ?, is_inside_campus = ?, is_display = ? WHERE achievement_id = ?`;
+        const result = await pool.execute(updateQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, achievement_id]);
+
+        // Send success response
+        res.json({ success: true, message: 'Achievement updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Route for achievement approval
+app.post('/api/approveachievement', async(req, res) => {
+    const { achievement_id, approval_date } = req.body;
+
+    try {
+        console.log('API approveachievement requested');
+
+        // Set approval_status to 1 and update approval_date
+        const updateQuery = `UPDATE achievements SET approval_status = ?, approval_date = ? WHERE achievement_id = ?`;
+        const result = await pool.execute(updateQuery, [1, approval_date, achievement_id]);
+
+        // Check if any rows were affected by the update
+        if (result[0].affectedRows === 0) {
+            console.log('Achievement not found');
+            return res.status(404).json({ error: 'Achievement not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Achievement approval status updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement approval status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Route for displaying approved achievements
+app.get('/api/displayachievements', async(req, res) => {
+    try {
+        console.log('API displayachievements requested');
+
+        // Select achievements with approval_status = 1
+        const selectQuery = 'SELECT * FROM achievements WHERE approval_status = ?';
+        const [achievements] = await pool.execute(selectQuery, [1]);
+
+        // Send response with the retrieved achievements
+        res.json({ success: true, achievements });
+    } catch (error) {
+        console.error('Error displaying achievements:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Route for adding achievements by admin
+app.post('/api/adminaddachievement', async(req, res) => {
+    const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
+
+    try {
+        console.log('API adminaddachievement requested');
+
+        // Insert new achievement into the achievements table with approval_status = 1
+        const insertQuery = `INSERT INTO achievements (description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`;
+        const result = await pool.execute(insertQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display]);
+
+        // Send response
+        res.json({ success: true, message: 'Achievement added successfully' });
+    } catch (error) {
+        console.error('Error adding achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Route for updating achievements by admin
+app.post('/api/adminupdateachievement', async(req, res) => {
+    const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
+
+    try {
+        console.log('API adminupdateachievement requested');
+
+        // Update the achievement in the database
+        const updateQuery = `UPDATE achievements SET description = ?, achievement_date = ?, roll_no = ?, name = ?, sport_id = ?, photo_path = ?, is_inside_campus = ?, is_display = ?, approval_status = 1 WHERE achievement_id = ?`;
+        const result = await pool.execute(updateQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, achievement_id]);
+
+        // Send success response
+        res.json({ success: true, message: 'Achievement updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement by admin:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 
 
 
@@ -1092,124 +1215,6 @@ app.get('/images', (req, res) => {
 });
 
 
-// Route for adding achievements
-app.post('/api/addachievement', async(req, res) => {
-    const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API addachievement requested');
-
-        // Insert new achievement into the achievements table
-        const insertQuery = `INSERT INTO achievements (description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await pool.execute(insertQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display]);
-
-        // Send response
-        res.json({ success: true, message: 'Achievement added successfully' });
-    } catch (error) {
-        console.error('Error adding achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for updating achievements
-app.post('/api/updateachievement', async(req, res) => {
-    const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API updateachievement requested');
-
-        // Update the achievement in the database
-        const updateQuery = `UPDATE achievements SET description = ?, achievement_date = ?, roll_no = ?, name = ?, sport_id = ?, photo_path = ?, is_inside_campus = ?, is_display = ? WHERE achievement_id = ?`;
-        const result = await pool.execute(updateQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, achievement_id]);
-
-        // Send success response
-        res.json({ success: true, message: 'Achievement updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for achievement approval
-app.post('/api/approveachievement', async(req, res) => {
-    const { achievement_id, approval_date } = req.body;
-
-    try {
-        console.log('API approveachievement requested');
-
-        // Set approval_status to 1 and update approval_date
-        const updateQuery = `UPDATE achievements SET approval_status = ?, approval_date = ? WHERE achievement_id = ?`;
-        const result = await pool.execute(updateQuery, [1, approval_date, achievement_id]);
-
-        // Check if any rows were affected by the update
-        if (result[0].affectedRows === 0) {
-            console.log('Achievement not found');
-            return res.status(404).json({ error: 'Achievement not found' });
-        }
-
-        // Send response
-        res.json({ success: true, message: 'Achievement approval status updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement approval status:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for displaying approved achievements
-app.get('/api/displayachievements', async(req, res) => {
-    try {
-        console.log('API displayachievements requested');
-
-        // Select achievements with approval_status = 1
-        const selectQuery = 'SELECT * FROM achievements WHERE approval_status = ?';
-        const [achievements] = await pool.execute(selectQuery, [1]);
-
-        // Send response with the retrieved achievements
-        res.json({ success: true, achievements });
-    } catch (error) {
-        console.error('Error displaying achievements:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for adding achievements by admin
-app.post('/api/adminaddachievement', async(req, res) => {
-    const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API adminaddachievement requested');
-
-        // Insert new achievement into the achievements table with approval_status = 1
-        const insertQuery = `INSERT INTO achievements (description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`;
-        const result = await pool.execute(insertQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display]);
-
-        // Send response
-        res.json({ success: true, message: 'Achievement added successfully' });
-    } catch (error) {
-        console.error('Error adding achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for updating achievements by admin
-app.post('/api/adminupdateachievement', async(req, res) => {
-    const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API adminupdateachievement requested');
-
-        // Update the achievement in the database
-        const updateQuery = `UPDATE achievements SET description = ?, achievement_date = ?, roll_no = ?, name = ?, sport_id = ?, photo_path = ?, is_inside_campus = ?, is_display = ?, approval_status = 1 WHERE achievement_id = ?`;
-        const result = await pool.execute(updateQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, achievement_id]);
-
-        // Send success response
-        res.json({ success: true, message: 'Achievement updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement by admin:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-    
 
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
