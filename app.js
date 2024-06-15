@@ -377,6 +377,21 @@ app.post('/api/addsports', async(req, res) => {
     }
 })
 
+// API endpoint for displaying sports data
+app.get('/api/displaysports', async(req, res) => {
+    try {
+        console.log('API displaysports requested');
+
+        // Retrieve data from the sports table
+        const [sportsData] = await pool.execute('SELECT * FROM sports');
+
+        // Send response with the retrieved sports data
+        res.json({ success: true, sports: sportsData });
+    } catch (error) {
+        console.error('Error displaying sports data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 // Route for adding security information
@@ -443,6 +458,33 @@ app.post('/addprofile', upload.single('photo'), async(req, res) => {
     }
 });
 
+// API endpoint for verifying roll number and date of birth
+app.post('/api/verifyroleno', async(req, res) => {
+    let { roll_no, dob } = req.body;
+
+    roll_no = roll_no.toLowerCase(); // Convert roll_no to lowercase
+
+    try {
+        console.log('API verifyroleno requested');
+
+        // Check if the user exists in the login table with the provided roll number and DOB
+        const [user] = await pool.execute('SELECT * FROM login WHERE LOWER(roll_no) = ? AND dob = ?', [roll_no, dob]);
+
+        if (user.length > 0) {
+            // If user exists and credentials are correct, return success
+            console.log('User authenticated');
+            res.json({ success: true, message: 'User authenticated successfully' });
+        } else {
+            // If user doesn't exist or credentials are incorrect, return error
+            console.log('Invalid credentials');
+            res.status(401).json({ error: 'Invalid credentials' });
+        }
+    } catch (error) {
+        console.error('Error verifying credentials:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 
 // API endpoint for verifying security question answer
 app.post('/api/verifysecurity', async(req, res) => {
@@ -498,7 +540,7 @@ app.post('/api/verifysecurity', async(req, res) => {
 
 
 // API endpoint for resetting password
-app.post('/resetpassword', async(req, res) => {
+app.post('/api/resetpassword', async(req, res) => {
     let { roll_no, new_password } = req.body;
 
     // Convert roll_no to lowercase
@@ -622,6 +664,23 @@ app.post('/api/changesport', async(req, res) => {
 });
 
 
+// API endpoint for displaying roles data
+app.get('/api/displayroles', async(req, res) => {
+    try {
+        console.log('API displayroles requested');
+
+        // Retrieve data from the roles table
+        const [rolesData] = await pool.execute('SELECT * FROM roles');
+
+        // Send response with the retrieved roles data
+        res.json({ success: true, roles: rolesData });
+    } catch (error) {
+        console.error('Error displaying roles data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 
 // API endpoint for changing a user's role
 app.post('/api/changeroll', async(req, res) => {
@@ -650,138 +709,6 @@ app.post('/api/changeroll', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-
-
-
-// API endpoint for updating profile year and concatenating new year with existing one
-app.post('/api/nextyear', async(req, res) => {
-    let { roll_no, year } = req.body;
-
-    // Convert roll_no to lowercase
-    roll_no = roll_no.toLowerCase();
-
-    try {
-        console.log('API nextyear requested');
-
-        // Retrieve existing year for the user with the provided roll number
-        const [existingYear] = await pool.execute('SELECT year FROM profile WHERE LOWER(roll_no) = ?', [roll_no]);
-
-        let newYear;
-        if (existingYear.length > 0) {
-            // Concatenate new year with existing one if it exists
-            newYear = existingYear[0].year ? `${existingYear[0].year},${year}` : year;
-
-            // Update profile year for the user with the provided roll number
-            const updateQuery = 'UPDATE profile SET year = ? WHERE LOWER(roll_no) = ?';
-            await pool.execute(updateQuery, [newYear, roll_no]);
-        } else {
-            // If the user doesn't exist, return an error
-            console.log('User not found');
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Send response
-        res.json({ success: true, message: 'Year updated successfully' });
-    } catch (error) {
-        console.error('Error updating year:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-
-// API endpoint for adding an event
-app.post('/api/addevent', async(req, res) => {
-    let { event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date } = req.body;
-
-    // Convert event_name, event_description, place, and roll_no (created_by) to lowercase
-    event_name = event_name.toLowerCase();
-    event_description = event_description.toLowerCase();
-    place = place.toLowerCase();
-    roll_no = roll_no.toLowerCase();
-
-    try {
-        console.log('API addevent requested');
-
-        // Insert new event into the events table with provided created_date
-        const insertQuery = `INSERT INTO events (event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await pool.execute(insertQuery, [event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date, 0]);
-
-        // Send response
-        res.json({ success: true, message: 'Event added successfully' });
-    } catch (error) {
-        console.error('Error adding event:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-
-// API endpoint for event approval
-app.post('/api/eventapproval', async(req, res) => {
-    const { event_id, approval_date } = req.body;
-
-    try {
-        console.log('API eventapproval requested');
-
-        // Set approval_status to 1 and update approval_date
-        const updateQuery = `UPDATE events SET approval_status = ?, approval_date = ? WHERE event_id = ?`;
-        const result = await pool.execute(updateQuery, [1, approval_date, event_id]);
-
-        // Check if any rows were affected by the update
-        if (result[0].affectedRows === 0) {
-            console.log('Event not found');
-            return res.status(404).json({ error: 'Event not found' });
-        }
-
-        // Send response
-        res.json({ success: true, message: 'Event approval status updated successfully' });
-    } catch (error) {
-        console.error('Error updating event approval status:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-// API endpoint for adding an event by admin
-app.post('/api/adminaddevent', async(req, res) => {
-    // Convert certain fields to lowercase before destructuring
-    const { event_name, event_description, place, created_by, created_date, sport_id, date, time, entry_fee, is_team, no_of_prize, category, gender, form_link, last_date } = req.body;
-
-    try {
-        console.log('API adminaddevent requested');
-
-        // Insert new event into the events table with approval_status = 1
-        const insertQuery = `INSERT INTO events (event_name, sport_id, date, time, place, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await pool.execute(insertQuery, [event_name.toLowerCase(), sport_id, date, time, place.toLowerCase(), entry_fee, is_team, event_description.toLowerCase(), no_of_prize, category, gender, form_link, last_date, created_by.toLowerCase(), created_date, 1]);
-
-        // Send response
-        res.json({ success: true, message: 'Event added successfully' });
-    } catch (error) {
-        console.error('Error adding event:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-
-// API endpoint for displaying approved events
-app.get('/api/displayevent', async(req, res) => {
-    try {
-        console.log('API displayevent requested');
-
-        // Select events with approval_status = 1
-        const selectQuery = 'SELECT * FROM events WHERE approval_status = ?';
-        const [events] = await pool.execute(selectQuery, [1]);
-
-        // Send response with the retrieved events
-        res.json({ success: true, events });
-    } catch (error) {
-        console.error('Error displaying events:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
 
 
 // API endpoint for displaying filtered members
@@ -841,22 +768,156 @@ app.post('/api/displaymembersfilter', async(req, res) => {
 
 
 
-// API endpoint for retrieving events created by a user
-app.post('/api/createdevents', async(req, res) => {
+// API endpoint for updating profile year and concatenating new year with existing one
+app.post('/api/nextyear', async(req, res) => {
+    let { roll_no, year } = req.body;
+
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API nextyear requested');
+
+        // Retrieve existing year for the user with the provided roll number
+        const [existingYear] = await pool.execute('SELECT year FROM profile WHERE LOWER(roll_no) = ?', [roll_no]);
+
+        let newYear;
+        if (existingYear.length > 0) {
+            // Concatenate new year with existing one if it exists
+            newYear = existingYear[0].year ? `${existingYear[0].year},${year}` : year;
+
+            // Update profile year for the user with the provided roll number
+            const updateQuery = 'UPDATE profile SET year = ? WHERE LOWER(roll_no) = ?';
+            await pool.execute(updateQuery, [newYear, roll_no]);
+        } else {
+            // If the user doesn't exist, return an error
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Year updated successfully' });
+    } catch (error) {
+        console.error('Error updating year:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+
+
+// API endpoint for adding an event
+app.post('/api/addevent', async(req, res) => {
+    let { event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date } = req.body;
+
+    // Convert event_name, event_description, place, and roll_no (created_by) to lowercase
+    event_name = event_name.toLowerCase();
+    event_description = event_description.toLowerCase();
+    place = place.toLowerCase();
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API addevent requested');
+
+        // Insert new event into the event table with provided created_date
+        const insertQuery = `INSERT INTO event (event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await pool.execute(insertQuery, [event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date, 0]);
+
+        // Send response
+        res.json({ success: true, message: 'Event added successfully' });
+    } catch (error) {
+        console.error('Error adding event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for event approval
+app.post('/api/eventapproval', async(req, res) => {
+    const { event_id, approval_date } = req.body;
+
+    try {
+        console.log('API eventapproval requested');
+
+        // Set approval_status to 1 and update approval_date
+        const updateQuery = `UPDATE event SET approval_status = ?, approval_date = ? WHERE event_id = ?`;
+        const result = await pool.execute(updateQuery, [1, approval_date, event_id]);
+
+        // Check if any rows were affected by the update
+        if (result[0].affectedRows === 0) {
+            console.log('Event not found');
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Event approval status updated successfully' });
+    } catch (error) {
+        console.error('Error updating event approval status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// API endpoint for adding an event by admin
+app.post('/api/adminaddevent', async(req, res) => {
+    // Convert certain fields to lowercase before destructuring
+    const { event_name, event_description, place, created_by, created_date, sport_id, date, time, entry_fee, is_team, no_of_prize, category, gender, form_link, last_date } = req.body;
+
+    try {
+        console.log('API adminaddevent requested');
+
+        // Insert new event into the event table with approval_status = 1
+        const insertQuery = `INSERT INTO event (event_name, sport_id, date, time, place, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await pool.execute(insertQuery, [event_name.toLowerCase(), sport_id, date, time, place.toLowerCase(), entry_fee, is_team, event_description.toLowerCase(), no_of_prize, category, gender, form_link, last_date, created_by.toLowerCase(), created_date, 1]);
+
+        // Send response
+        res.json({ success: true, message: 'Event added successfully' });
+    } catch (error) {
+        console.error('Error adding event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for displaying approved event
+app.get('/api/displayevent', async(req, res) => {
+    try {
+        console.log('API displayevent requested');
+
+        // Select event with approval_status = 1
+        const selectQuery = 'SELECT * FROM event WHERE approval_status = ?';
+        const [event] = await pool.execute(selectQuery, [1]);
+
+        // Send response with the retrieved event
+        res.json({ success: true, event });
+    } catch (error) {
+        console.error('Error displaying event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+
+// API endpoint for retrieving event created by a user
+app.post('/api/createdevent', async(req, res) => {
     const { roll_no } = req.body; // Get roll number from request body and convert to lowercase
     const rollNoLower = roll_no.toLowerCase();
 
     try {
-        console.log('API createdevents requested');
+        console.log('API createdevent requested');
 
-        // Retrieve events created by the specified user from the profile table
+        // Retrieve event created by the specified user from the profile table
         const selectQuery = 'SELECT * FROM profile WHERE created_by = ?';
-        const [createdEvents] = await pool.execute(selectQuery, [rollNoLower]);
+        const [createdevent] = await pool.execute(selectQuery, [rollNoLower]);
 
-        // Send response with the created events
-        res.json({ success: true, createdEvents });
+        // Send response with the created event
+        res.json({ success: true, createdevent });
     } catch (error) {
-        console.error('Error retrieving created events:', error);
+        console.error('Error retrieving created event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -870,7 +931,7 @@ app.post('/api/updateevent', async(req, res) => {
     try {
         console.log('API updateevent requested');
 
-        const [eventRows] = await pool.execute('SELECT approval_status FROM events WHERE event_id = ?', [event_id]);
+        const [eventRows] = await pool.execute('SELECT approval_status FROM event WHERE event_id = ?', [event_id]);
 
         if (eventRows.length === 0) {
             return res.status(404).json({ error: 'Event not found' });
@@ -883,7 +944,7 @@ app.post('/api/updateevent', async(req, res) => {
 
         // Update the event in the database
         const updateQuery = `
-            UPDATE events 
+            UPDATE event 
             SET 
                 event_name = ?, 
                 sport_id = ?, 
@@ -936,7 +997,7 @@ app.post('/api/adminupdateevent', async(req, res) => {
 
         // Update the event in the database
         const updateQuery = `
-            UPDATE events 
+            UPDATE event 
             SET 
                 event_name = ?, 
                 sport_id = ?, 
@@ -978,6 +1039,10 @@ app.post('/api/adminupdateevent', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+
+
+
 
 
 
