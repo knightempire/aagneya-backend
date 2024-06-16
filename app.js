@@ -1061,6 +1061,8 @@ app.post('/api/addachievement', async(req, res) => {
     }
 });
 
+
+
 // Route for updating achievements
 app.post('/api/updateachievement', async(req, res) => {
     const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
@@ -1079,6 +1081,7 @@ app.post('/api/updateachievement', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 
 
 // Route for achievement approval
@@ -1281,6 +1284,210 @@ app.post('/api/adminupdateblog', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+
+
+// Route for creating an election
+app.post('/api/createelection', async(req, res) => {
+    const { year } = req.body;
+
+    try {
+        console.log('API createelection requested');
+
+        // Insert new election into the election table with is_register set to 1
+        const insertQuery = `INSERT INTO election (year, is_register, is_vote) VALUES (?, 1, 0)`;
+        const result = await pool.execute(insertQuery, [year]);
+
+        // Send response
+        res.json({ success: true, message: 'Election created successfully' });
+    } catch (error) {
+        console.error('Error creating election:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// Route for registering candidates for an election
+app.post('/api/electionregister', async(req, res) => {
+    const { election_id, roll_no, role_id } = req.body;
+
+    try {
+        console.log('API electionregister requested');
+        // Fetch candidate with the same reg_roll_no for the given election_id
+        const fetchCandidateQuery = 'SELECT candidate_id, role_id FROM candidate WHERE election_id = ? AND reg_roll_no = ?';
+        const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id, roll_no]);
+
+        // Check if candidate already exists
+        if (candidateRows.length > 0) {
+            const { role_id } = candidateRows[0];
+
+            // Fetch role_name based on role_id
+            const fetchRoleQuery = 'SELECT role_name FROM roles WHERE role_id = ?';
+            const [roleRows] = await pool.execute(fetchRoleQuery, [role_id]);
+
+            if (roleRows.length > 0) {
+                const { role_name } = roleRows[0];
+                return res.status(400).json({ error: `You are already registered for this election as ${role_name}` });
+            }
+        }
+
+        // If candidate does not exist, proceed with insertion
+        const insertQuery = 'INSERT INTO candidate (election_id, reg_roll_no, role_id) VALUES (?, ?, ?)';
+        const result = await pool.execute(insertQuery, [election_id, roll_no, role_id]);
+
+        res.json({ success: true, message: 'Registration successful' });
+    } catch (error) {
+        console.error('Error registering candidate:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// Route for opening registration for an election
+app.post('/api/electionregisteropen', async(req, res) => {
+    const { election_id } = req.body;
+
+    try {
+        console.log('API electionregisteropen requested');
+        // Check if the election is already open for registration
+        const checkQuery = 'SELECT is_register FROM election WHERE election_id = ?';
+        const [rows] = await pool.execute(checkQuery, [election_id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Election not found' });
+        }
+
+        const { is_register } = rows[0];
+
+        // If already open for registration, return error
+        if (is_register === 1) {
+            return res.status(400).json({ error: 'Registration is already open for this election' });
+        }
+
+        // Update election to set is_register = 1
+        const updateQuery = 'UPDATE election SET is_register = 1 WHERE election_id = ?';
+        await pool.execute(updateQuery, [election_id]);
+
+        res.json({ success: true, message: 'Registration opened successfully' });
+    } catch (error) {
+        console.error('Error opening registration for election:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// Route for closing registration for an election
+app.post('/api/electionregisterclose', async(req, res) => {
+    const { election_id } = req.body;
+
+    try {
+        console.log('API electionregisterclose requested');
+        // Fetch current is_register status for the election
+        const fetchQuery = 'SELECT is_register FROM election WHERE election_id = ?';
+        const [rows] = await pool.execute(fetchQuery, [election_id]);
+
+        // Check if election exists
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Election not found' });
+        }
+
+        const { is_register } = rows[0];
+
+        // If registration is already closed, return error
+        if (is_register === 0) {
+            return res.status(400).json({ error: 'Registration for this election is already closed' });
+        }
+
+        // Update election to set is_register = 0
+        const updateQuery = 'UPDATE election SET is_register = 0 WHERE election_id = ?';
+        const [result] = await pool.execute(updateQuery, [election_id]);
+
+        res.json({ success: true, message: 'Registration closed successfully' });
+    } catch (error) {
+        console.error('Error closing registration for election:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// Route for opening voting for an election
+app.post('/api/electionvoteopen', async(req, res) => {
+    const { election_id } = req.body;
+
+    try {
+        console.log('API electionvoteopen requested');
+        // Fetch current is_vote status for the election
+        const fetchQuery = 'SELECT is_vote FROM election WHERE election_id = ?';
+        const [rows] = await pool.execute(fetchQuery, [election_id]);
+
+        // Check if election exists
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Election not found' });
+        }
+
+        const { is_vote } = rows[0];
+
+        // If voting is already open, return error
+        if (is_vote === 1) {
+            return res.status(400).json({ error: 'Voting for this election is already open' });
+        }
+
+        // Update election to set is_vote = 1
+        const updateQuery = 'UPDATE election SET is_vote = 1 WHERE election_id = ?';
+        const [result] = await pool.execute(updateQuery, [election_id]);
+
+        res.json({ success: true, message: 'Voting opened successfully' });
+    } catch (error) {
+        console.error('Error opening voting for election:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// Route for closing voting for an election
+app.post('/api/electionvoteclose', async(req, res) => {
+    const { election_id } = req.body;
+
+    try {
+        console.log('API electionvoteclose requested');
+        // Fetch current is_vote status for the election
+        const fetchQuery = 'SELECT is_vote FROM election WHERE election_id = ?';
+        const [rows] = await pool.execute(fetchQuery, [election_id]);
+
+        // Check if election exists
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Election not found' });
+        }
+
+        const { is_vote } = rows[0];
+
+        // If voting is already closed, return error
+        if (is_vote === 0) {
+            return res.status(400).json({ error: 'Voting for this election is already closed' });
+        }
+
+        // Update election to set is_vote = 0
+        const updateQuery = 'UPDATE election SET is_vote = 0 WHERE election_id = ?';
+        const [result] = await pool.execute(updateQuery, [election_id]);
+
+        res.json({ success: true, message: 'Voting closed successfully' });
+    } catch (error) {
+        console.error('Error closing voting for election:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+
+
+
+
 
 
 
