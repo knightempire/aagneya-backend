@@ -1164,7 +1164,123 @@ app.post('/api/adminupdateachievement', async(req, res) => {
     }
 });
 
+// Route for adding blogs
+app.post('/api/addblog', async(req, res) => {
+    const { title, img_path, description, creation_date, created_by } = req.body;
 
+    try {
+        console.log('API addblog requested');
+
+        // Insert new blog into the blogs table
+        const insertQuery = `INSERT INTO blogs (title, img_path, description, creation_date, created_by, is_approved) VALUES (?, ?, ?, ?, ?, 0)`;
+        const result = await pool.execute(insertQuery, [title, img_path, description, creation_date, created_by]);
+
+        // Send response
+        res.json({ success: true, message: 'Blog added successfully' });
+    } catch (error) {
+        console.error('Error adding blog:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route for updating blogs
+app.post('/api/updateblog', async(req, res) => {
+    const { blog_id, title, img_path, description, creation_date } = req.body;
+
+    try {
+        console.log('API updateblog requested');
+
+        // Update the blog in the database
+        const updateQuery = `UPDATE blogs SET title = ?, img_path = ?, description = ?, creation_date = ? WHERE blog_id = ?`;
+        const result = await pool.execute(updateQuery, [title, img_path, description, creation_date, blog_id]);
+
+        // Send success response
+        res.json({ success: true, message: 'Blog updated successfully' });
+    } catch (error) {
+        console.error('Error updating blog:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route for blog approval
+app.post('/api/approveblog', async(req, res) => {
+    const { blog_id, approval_date } = req.body;
+
+    try {
+        console.log('API approveblog requested');
+
+        // Set is_approved to 1 and update approval_date
+        const updateQuery = `UPDATE blogs SET is_approved = 1, approval_date = ? WHERE blog_id = ?`;
+        const result = await pool.execute(updateQuery, [approval_date, blog_id]);
+
+        // Check if any rows were affected by the update
+        if (result[0].affectedRows === 0) {
+            console.log('Blog not found');
+            return res.status(404).json({ error: 'Blog not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Blog approval status updated successfully' });
+    } catch (error) {
+        console.error('Error updating blog approval status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route for displaying approved blogs
+app.get('/api/displayblogs', async(req, res) => {
+    try {
+        console.log('API displayblogs requested');
+
+        // Select blogs with is_approved = 1
+        const selectQuery = 'SELECT * FROM blogs WHERE is_approved = 1';
+        const [blogs] = await pool.execute(selectQuery);
+
+        // Send response with the retrieved blogs
+        res.json({ success: true, blogs });
+    } catch (error) {
+        console.error('Error displaying blogs:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route for adding blogs by admin
+app.post('/api/adminaddblog', async(req, res) => {
+    const { title, img_path, description, creation_date, created_by } = req.body;
+
+    try {
+        console.log('API adminaddblog requested');
+
+        // Insert new blog into the blogs table with is_approved = 1
+        const insertQuery = `INSERT INTO blogs (title, img_path, description, creation_date, created_by, is_approved) VALUES (?, ?, ?, ?, ?, 1)`;
+        const result = await pool.execute(insertQuery, [title, img_path, description, creation_date, created_by]);
+
+        // Send response
+        res.json({ success: true, message: 'Blog added successfully' });
+    } catch (error) {
+        console.error('Error adding blog:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Route for updating blogs by admin
+app.post('/api/adminupdateblog', async(req, res) => {
+    const { blog_id, title, img_path, description, creation_date } = req.body;
+
+    try {
+        console.log('API adminupdateblog requested');
+
+        // Update the blog in the database
+        const updateQuery = `UPDATE blogs SET title = ?, img_path = ?, description = ?, creation_date = ?, is_approved = 1 WHERE blog_id = ?`;
+        const result = await pool.execute(updateQuery, [title, img_path, description, creation_date, blog_id]);
+
+        // Send success response
+        res.json({ success: true, message: 'Blog updated successfully' });
+    } catch (error) {
+        console.error('Error updating blog by admin:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 
