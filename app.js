@@ -1485,6 +1485,53 @@ app.post('/api/electionvoteclose', async(req, res) => {
 
 
 
+// Route for voting
+app.post('/api/vote', async(req, res) => {
+    const { election_id, role_id, roll_no, candidate_id, gender } = req.body;
+
+    try {
+        console.log('API vote requested');
+
+        // Convert roll_no to lowercase
+        const voter_roll_no = roll_no.toLowerCase();
+
+        // Check if the election is still open for voting
+        const checkElectionQuery = 'SELECT is_vote FROM election WHERE election_id = ?';
+        const [electionResult] = await pool.execute(checkElectionQuery, [election_id]);
+
+        // Verify if the election exists and is open for voting
+        if (electionResult.length === 0) {
+            return res.status(404).json({ error: 'Election not found' });
+        }
+
+        const { is_vote } = electionResult[0];
+
+        if (is_vote !== 1) {
+            return res.status(400).json({ error: 'Voting for this election is closed' });
+        }
+
+        // Check if the voter has already voted in this election and role for the given gender
+        const checkVoteQuery = 'SELECT * FROM vote WHERE election_id = ? AND role_id = ? AND voter_roll_no = ? AND gender = ?';
+        const [existingVotes] = await pool.execute(checkVoteQuery, [election_id, role_id, voter_roll_no, gender]);
+
+        // If a vote already exists, return an error
+        if (existingVotes.length > 0) {
+            return res.status(400).json({ error: 'You have already voted for this election and role' });
+        }
+
+        // Insert into the vote table
+        const insertQuery = 'INSERT INTO vote (election_id, role_id, voter_roll_no, candidate_id, gender) VALUES (?, ?, ?, ?, ?)';
+        const [result] = await pool.execute(insertQuery, [election_id, role_id, voter_roll_no, candidate_id, gender]);
+
+        res.json({ success: true, message: 'Vote recorded successfully' });
+    } catch (error) {
+        console.error('Error recording vote:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
 
 
 
