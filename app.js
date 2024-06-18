@@ -1042,145 +1042,22 @@ app.post('/api/adminupdateevent', async(req, res) => {
 
 
 
-// Route for adding achievements
-app.post('/api/addachievement', async(req, res) => {
-    const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API addachievement requested');
-
-        // Insert new achievement into the achievements table
-        const insertQuery = `INSERT INTO achievements (description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await pool.execute(insertQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display]);
-
-        // Send response
-        res.json({ success: true, message: 'Achievement added successfully' });
-    } catch (error) {
-        console.error('Error adding achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-
-// Route for updating achievements
-app.post('/api/updateachievement', async(req, res) => {
-    const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API updateachievement requested');
-
-        // Update the achievement in the database
-        const updateQuery = `UPDATE achievements SET description = ?, achievement_date = ?, roll_no = ?, name = ?, sport_id = ?, photo_path = ?, is_inside_campus = ?, is_display = ? WHERE achievement_id = ?`;
-        const result = await pool.execute(updateQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, achievement_id]);
-
-        // Send success response
-        res.json({ success: true, message: 'Achievement updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-
-// Route for achievement approval
-app.post('/api/approveachievement', async(req, res) => {
-    const { achievement_id, approval_date } = req.body;
-
-    try {
-        console.log('API approveachievement requested');
-
-        // Set approval_status to 1 and update approval_date
-        const updateQuery = `UPDATE achievements SET approval_status = ?, approval_date = ? WHERE achievement_id = ?`;
-        const result = await pool.execute(updateQuery, [1, approval_date, achievement_id]);
-
-        // Check if any rows were affected by the update
-        if (result[0].affectedRows === 0) {
-            console.log('Achievement not found');
-            return res.status(404).json({ error: 'Achievement not found' });
-        }
-
-        // Send response
-        res.json({ success: true, message: 'Achievement approval status updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement approval status:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-// Route for displaying approved achievements
-app.get('/api/displayachievements', async(req, res) => {
-    try {
-        console.log('API displayachievements requested');
-
-        // Select achievements with approval_status = 1
-        const selectQuery = 'SELECT * FROM achievements WHERE approval_status = ?';
-        const [achievements] = await pool.execute(selectQuery, [1]);
-
-        // Send response with the retrieved achievements
-        res.json({ success: true, achievements });
-    } catch (error) {
-        console.error('Error displaying achievements:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-// Route for adding achievements by admin
-app.post('/api/adminaddachievement', async(req, res) => {
-    const { description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API adminaddachievement requested');
-
-        // Insert new achievement into the achievements table with approval_status = 1
-        const insertQuery = `INSERT INTO achievements (description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`;
-        const result = await pool.execute(insertQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display]);
-
-        // Send response
-        res.json({ success: true, message: 'Achievement added successfully' });
-    } catch (error) {
-        console.error('Error adding achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-// Route for updating achievements by admin
-app.post('/api/adminupdateachievement', async(req, res) => {
-    const { achievement_id, description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display } = req.body;
-
-    try {
-        console.log('API adminupdateachievement requested');
-
-        // Update the achievement in the database
-        const updateQuery = `UPDATE achievements SET description = ?, achievement_date = ?, roll_no = ?, name = ?, sport_id = ?, photo_path = ?, is_inside_campus = ?, is_display = ?, approval_status = 1 WHERE achievement_id = ?`;
-        const result = await pool.execute(updateQuery, [description, achievement_date, roll_no, name, sport_id, photo_path, is_inside_campus, is_display, achievement_id]);
-
-        // Send success response
-        res.json({ success: true, message: 'Achievement updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement by admin:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-
-
-// Route for adding blogs
+// Add Blog
 app.post('/api/addblog', async(req, res) => {
-    const { title, img_path, description, creation_date, created_by } = req.body;
+    let { title, img_path, description, creation_date, approval_date, created_by } = req.body;
+
+    // Convert necessary fields to lowercase
+    title = title.toLowerCase();
+    description = description.toLowerCase();
+    created_by = created_by.toLowerCase();
 
     try {
         console.log('API addblog requested');
 
-        // Insert new blog into the blogs table
-        const insertQuery = `INSERT INTO blogs (title, img_path, description, creation_date, created_by, is_approved) VALUES (?, ?, ?, ?, ?, 0)`;
-        const result = await pool.execute(insertQuery, [title, img_path, description, creation_date, created_by]);
+        // Insert new blog into the blog table with provided creation_date and approval_date
+        const insertQuery = `INSERT INTO blog (title, img_path, description, creation_date, approval_date, created_by, is_approved) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        await pool.execute(insertQuery, [title, img_path, description, creation_date, approval_date, created_by, 0]);
 
-        // Send response
         res.json({ success: true, message: 'Blog added successfully' });
     } catch (error) {
         console.error('Error adding blog:', error);
@@ -1188,43 +1065,22 @@ app.post('/api/addblog', async(req, res) => {
     }
 });
 
-// Route for updating blogs
-app.post('/api/updateblog', async(req, res) => {
-    const { blog_id, title, img_path, description, creation_date } = req.body;
-
-    try {
-        console.log('API updateblog requested');
-
-        // Update the blog in the database
-        const updateQuery = `UPDATE blogs SET title = ?, img_path = ?, description = ?, creation_date = ? WHERE blog_id = ?`;
-        const result = await pool.execute(updateQuery, [title, img_path, description, creation_date, blog_id]);
-
-        // Send success response
-        res.json({ success: true, message: 'Blog updated successfully' });
-    } catch (error) {
-        console.error('Error updating blog:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for blog approval
-app.post('/api/approveblog', async(req, res) => {
+// Blog Approval
+app.post('/api/blogapproval', async(req, res) => {
     const { blog_id, approval_date } = req.body;
 
     try {
-        console.log('API approveblog requested');
+        console.log('API blogapproval requested');
 
         // Set is_approved to 1 and update approval_date
-        const updateQuery = `UPDATE blogs SET is_approved = 1, approval_date = ? WHERE blog_id = ?`;
-        const result = await pool.execute(updateQuery, [approval_date, blog_id]);
+        const updateQuery = `UPDATE blog SET is_approved = ?, approval_date = ? WHERE blog_id = ?`;
+        const result = await pool.execute(updateQuery, [1, approval_date, blog_id]);
 
-        // Check if any rows were affected by the update
         if (result[0].affectedRows === 0) {
             console.log('Blog not found');
             return res.status(404).json({ error: 'Blog not found' });
         }
 
-        // Send response
         res.json({ success: true, message: 'Blog approval status updated successfully' });
     } catch (error) {
         console.error('Error updating blog approval status:', error);
@@ -1232,35 +1088,17 @@ app.post('/api/approveblog', async(req, res) => {
     }
 });
 
-// Route for displaying approved blogs
-app.get('/api/displayblogs', async(req, res) => {
-    try {
-        console.log('API displayblogs requested');
-
-        // Select blogs with is_approved = 1
-        const selectQuery = 'SELECT * FROM blogs WHERE is_approved = 1';
-        const [blogs] = await pool.execute(selectQuery);
-
-        // Send response with the retrieved blogs
-        res.json({ success: true, blogs });
-    } catch (error) {
-        console.error('Error displaying blogs:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// Route for adding blogs by admin
+// Admin Add Blog
 app.post('/api/adminaddblog', async(req, res) => {
-    const { title, img_path, description, creation_date, created_by } = req.body;
+    const { title, img_path, description, created_by, creation_date, approval_date } = req.body;
 
     try {
         console.log('API adminaddblog requested');
 
-        // Insert new blog into the blogs table with is_approved = 1
-        const insertQuery = `INSERT INTO blogs (title, img_path, description, creation_date, created_by, is_approved) VALUES (?, ?, ?, ?, ?, 1)`;
-        const result = await pool.execute(insertQuery, [title, img_path, description, creation_date, created_by]);
+        // Insert new blog into the blog table with is_approved = 1
+        const insertQuery = `INSERT INTO blog (title, img_path, description, creation_date, approval_date, created_by, is_approved) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+        await pool.execute(insertQuery, [title.toLowerCase(), img_path, description.toLowerCase(), creation_date, approval_date, created_by.toLowerCase(), 1]);
 
-        // Send response
         res.json({ success: true, message: 'Blog added successfully' });
     } catch (error) {
         console.error('Error adding blog:', error);
@@ -1268,18 +1106,117 @@ app.post('/api/adminaddblog', async(req, res) => {
     }
 });
 
-// Route for updating blogs by admin
+// Display Approved Blogs
+app.get('/api/displayblogs', async(req, res) => {
+    try {
+        console.log('API displayblogs requested');
+
+        const selectQuery = 'SELECT * FROM blog WHERE is_approved = ?';
+        const [blogs] = await pool.execute(selectQuery, [1]);
+
+        res.json({ success: true, blogs });
+    } catch (error) {
+        console.error('Error displaying blogs:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Retrieve Created Blogs by Roll Number
+app.post('/api/createdblogs', async(req, res) => {
+    const { roll_no } = req.body;
+    const rollNoLower = roll_no.toLowerCase();
+
+    try {
+        console.log('API createdblogs requested');
+
+        // Retrieve blogs created by the specified roll number
+        const selectQuery = 'SELECT * FROM blog WHERE created_by = ?';
+        const [createdBlogs] = await pool.execute(selectQuery, [rollNoLower]);
+
+        res.json({ success: true, createdBlogs });
+    } catch (error) {
+        console.error('Error retrieving created blogs:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+app.post('/api/updateblog', async(req, res) => {
+    const { blog_id, title, img_path, description, creation_date, approval_date } = req.body;
+
+    try {
+        console.log('API updateblog requested');
+
+        // Check if the blog exists and its current is_approved status
+        const [blogRows] = await pool.execute('SELECT is_approved FROM blog WHERE blog_id = ?', [blog_id]);
+
+        if (blogRows.length === 0) {
+            return res.status(404).json({ error: 'Blog not found' });
+        }
+
+        const isApproved = blogRows[0].is_approved;
+
+        // Check if the blog is already approved
+        if (isApproved === 1) {
+            return res.status(403).json({ error: 'Blog is already published and cannot be edited' });
+        }
+
+        // Update the blog
+        const updateQuery = `
+            UPDATE blog 
+            SET 
+                title = ?, 
+                img_path = ?, 
+                description = ?, 
+                creation_date = ?, 
+                approval_date = ? 
+            WHERE 
+                blog_id = ?`;
+
+        await pool.execute(updateQuery, [
+            title,
+            img_path,
+            description,
+            creation_date,
+            approval_date,
+            blog_id
+        ]);
+
+        res.json({ success: true, message: 'Blog updated successfully' });
+    } catch (error) {
+        console.error('Error updating blog:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// Admin Update Blog
 app.post('/api/adminupdateblog', async(req, res) => {
-    const { blog_id, title, img_path, description, creation_date } = req.body;
+    const { blog_id, title, img_path, description, creation_date, approval_date } = req.body;
 
     try {
         console.log('API adminupdateblog requested');
 
-        // Update the blog in the database
-        const updateQuery = `UPDATE blogs SET title = ?, img_path = ?, description = ?, creation_date = ?, is_approved = 1 WHERE blog_id = ?`;
-        const result = await pool.execute(updateQuery, [title, img_path, description, creation_date, blog_id]);
+        const updateQuery = `
+            UPDATE blog 
+            SET 
+                title = ?, 
+                img_path = ?, 
+                description = ?, 
+                creation_date = ?, 
+                approval_date = ? 
+            WHERE 
+                blog_id = ?`;
 
-        // Send success response
+        await pool.execute(updateQuery, [
+            title,
+            img_path,
+            description,
+            creation_date,
+            approval_date,
+            blog_id
+        ]);
+
         res.json({ success: true, message: 'Blog updated successfully' });
     } catch (error) {
         console.error('Error updating blog by admin:', error);
@@ -1289,21 +1226,197 @@ app.post('/api/adminupdateblog', async(req, res) => {
 
 
 
-// Route for creating an election
-app.post('/api/createelection', async(req, res) => {
-    const { year } = req.body;
+// Add Achievement
+app.post('/api/addachievement', async(req, res) => {
+    let { description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
+
+    // Convert necessary fields to lowercase
+    roll_no = roll_no.toLowerCase();
+    name = name.toLowerCase();
+    description = description.toLowerCase();
 
     try {
-        console.log('API createelection requested');
+        console.log('API addachievement requested');
 
-        // Insert new election into the election table with is_register set to 1
-        const insertQuery = `INSERT INTO election (year, is_register, is_vote) VALUES (?, 1, 0)`;
-        const result = await pool.execute(insertQuery, [year]);
+        // Insert new achievement into the achievement table
+        const insertQuery = `INSERT INTO achievement (description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        await pool.execute(insertQuery, [description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, 0]);
 
-        // Send response
-        res.json({ success: true, message: 'Election created successfully' });
+        res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-        console.error('Error creating election:', error);
+        console.error('Error adding achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Achievement Approval
+app.post('/api/achievementapproval', async(req, res) => {
+    const { achievement_id } = req.body;
+
+    try {
+        console.log('API achievementapproval requested');
+
+        // Set is_display to 1
+        const updateQuery = `UPDATE achievement SET is_display = ? WHERE achievement_id = ?`;
+        const result = await pool.execute(updateQuery, [1, achievement_id]);
+
+        if (result[0].affectedRows === 0) {
+            console.log('Achievement not found');
+            return res.status(404).json({ error: 'Achievement not found' });
+        }
+
+        res.json({ success: true, message: 'Achievement approval status updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement approval status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Admin Add Achievement
+app.post('/api/adminaddachievement', async(req, res) => {
+    let { description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
+
+    // Convert necessary fields to lowercase
+    roll_no = roll_no.toLowerCase();
+    name = name.toLowerCase();
+    description = description.toLowerCase();
+
+    try {
+        console.log('API adminaddachievement requested');
+
+        // Insert new achievement into the achievement table with is_display = 1
+        const insertQuery = `INSERT INTO achievement (description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        await pool.execute(insertQuery, [description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, 1]);
+
+        res.json({ success: true, message: 'Achievement added successfully' });
+    } catch (error) {
+        console.error('Error adding achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Display Approved Achievements
+app.get('/api/displayachievements', async(req, res) => {
+    try {
+        console.log('API displayachievements requested');
+
+        const selectQuery = 'SELECT * FROM achievement WHERE is_display = ?';
+        const [achievements] = await pool.execute(selectQuery, [1]);
+
+        res.json({ success: true, achievements });
+    } catch (error) {
+        console.error('Error displaying achievements:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Retrieve Created Achievements by Roll Number
+app.post('/api/createdachievements', async(req, res) => {
+    const { roll_no } = req.body;
+    const rollNoLower = roll_no.toLowerCase();
+
+    try {
+        console.log('API createdachievements requested');
+
+        // Retrieve achievements created by the specified roll number
+        const selectQuery = 'SELECT * FROM achievement WHERE roll_no = ?';
+        const [createdAchievements] = await pool.execute(selectQuery, [rollNoLower]);
+
+        res.json({ success: true, createdAchievements });
+    } catch (error) {
+        console.error('Error retrieving created achievements:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Update Achievement
+app.post('/api/updateachievement', async(req, res) => {
+    const { achievement_id, description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
+
+    try {
+        console.log('API updateachievement requested');
+
+        // Check if the achievement exists and its current is_display status
+        const [achievementRows] = await pool.execute('SELECT is_display FROM achievement WHERE achievement_id = ?', [achievement_id]);
+
+        if (achievementRows.length === 0) {
+            return res.status(404).json({ error: 'Achievement not found' });
+        }
+
+        const isDisplay = achievementRows[0].is_display;
+
+        // Check if the achievement is already displayed
+        if (isDisplay === 1) {
+            return res.status(403).json({ error: 'Achievement is already published and cannot be edited' });
+        }
+
+        // Update the achievement
+        const updateQuery = `
+            UPDATE achievement 
+            SET 
+                description = ?, 
+                achievement_date = ?, 
+                roll_no = ?, 
+                name = ?, 
+                photo_path = ?, 
+                is_team = ?, 
+                is_inside_campus = ? 
+            WHERE 
+                achievement_id = ?`;
+
+        await pool.execute(updateQuery, [
+            description,
+            achievement_date,
+            roll_no.toLowerCase(),
+            name.toLowerCase(),
+            photo_path,
+            is_team,
+            is_inside_campus,
+            achievement_id
+        ]);
+
+        res.json({ success: true, message: 'Achievement updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Admin Update Achievement
+app.post('/api/adminupdateachievement', async(req, res) => {
+    const { achievement_id, description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
+
+    try {
+        console.log('API adminupdateachievement requested');
+
+        // Update the achievement in the database
+        const updateQuery = `
+            UPDATE achievement 
+            SET 
+                description = ?, 
+                achievement_date = ?, 
+                roll_no = ?, 
+                name = ?, 
+                photo_path = ?, 
+                is_team = ?, 
+                is_inside_campus = ? 
+            WHERE 
+                achievement_id = ?`;
+
+        await pool.execute(updateQuery, [
+            description,
+            achievement_date,
+            roll_no.toLowerCase(),
+            name.toLowerCase(),
+            photo_path,
+            is_team,
+            is_inside_campus,
+            achievement_id
+        ]);
+
+        res.json({ success: true, message: 'Achievement updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -1535,160 +1648,6 @@ app.post('/api/vote', async(req, res) => {
 
 
 
-// Route for getting vote results for a specific election, structured by role_id
-app.post('/api/voteresult', async(req, res) => {
-    const { election_id } = req.body;
-
-    try {
-        console.log('API voteresult requested');
-        if (!election_id) {
-            return res.status(400).json({ error: 'Election ID is required in the request body' });
-        }
-
-        // Query to get vote results for all role_ids and sorted by role_id
-        const voteResultQuery = `
-            SELECT v.role_id, v.candidate_id, c.reg_roll_no, c.gender, COUNT(*) as vote_count
-            FROM vote v
-            INNER JOIN candidate c ON v.candidate_id = c.candidate_id
-            WHERE v.election_id = ?
-            GROUP BY v.role_id, v.candidate_id, c.gender
-            ORDER BY v.role_id, c.gender
-        `;
-
-        const [voteResults] = await pool.execute(voteResultQuery, [election_id]);
-
-        if (voteResults.length === 0) {
-            return res.status(404).json({ error: 'No vote results found for this election' });
-        }
-
-        // Query to fetch role information from roles table
-        const rolesQuery = 'SELECT role_id, role_name FROM roles';
-        const [roles] = await pool.execute(rolesQuery);
-
-        // Map roles to role_id for quick lookup
-        const roleMap = {};
-        roles.forEach(role => {
-            roleMap[role.role_id] = role.role_name;
-        });
-
-        // Query to fetch profiles and map roll_no to names
-        const rollNos = voteResults.map(result => result.reg_roll_no);
-        const profilesQuery = 'SELECT roll_no, name FROM profiles WHERE roll_no IN (?)';
-        const [profiles] = await pool.execute(profilesQuery, [rollNos]);
-
-        // Map roll_no to names for quick lookup
-        const nameMap = {};
-        profiles.forEach(profile => {
-            nameMap[profile.roll_no] = profile.name;
-        });
-
-        // Calculate total votes for each role_id and gender in the election
-        const totalVotesQuery = `
-            SELECT role_id, gender, COUNT(*) as total_votes
-            FROM vote
-            WHERE election_id = ?
-            GROUP BY role_id, gender
-        `;
-        const [totalVotesResults] = await pool.execute(totalVotesQuery, [election_id]);
-
-        // Map the total votes to a role_id and gender indexed object
-        const totalVotesMap = {};
-        totalVotesResults.forEach(result => {
-            if (!totalVotesMap[result.role_id]) {
-                totalVotesMap[result.role_id] = {};
-            }
-            totalVotesMap[result.role_id][result.gender] = result.total_votes;
-        });
-
-        // Format the results by role_id with vote results nested under each gender
-        const formattedResults = [];
-
-        // Group vote results by role_id and gender
-        const groupedResults = {};
-        voteResults.forEach(result => {
-            if (!groupedResults[result.role_id]) {
-                groupedResults[result.role_id] = {
-                    role_id: result.role_id,
-                    role_name: roleMap[result.role_id] || 'Unknown Role',
-                    gender: {}
-                };
-            }
-            if (!groupedResults[result.role_id].gender[result.gender]) {
-                groupedResults[result.role_id].gender[result.gender] = {
-                    total_votes: totalVotesMap[result.role_id][result.gender] || 0,
-                    vote_results: []
-                };
-            }
-            groupedResults[result.role_id].gender[result.gender].vote_results.push({
-                candidate_id: result.candidate_id,
-                reg_roll_no: result.reg_roll_no,
-                gender: result.gender,
-                vote_count: result.vote_count,
-                vote_percentage: totalVotesMap[result.role_id][result.gender] > 0 ?
-                    (result.vote_count / totalVotesMap[result.role_id][result.gender]) * 100 : 0,
-                name: nameMap[result.reg_roll_no] || 'Unknown'
-            });
-        });
-
-        // Push grouped results into formatted array
-        Object.keys(groupedResults).forEach(role_id => {
-            const roleData = groupedResults[role_id];
-            const roleEntry = {
-                role_id: roleData.role_id,
-                role_name: roleData.role_name,
-                gender: []
-            };
-            Object.keys(roleData.gender).forEach(gender => {
-                roleEntry.gender.push({
-                    [gender]: {
-                        total_votes: roleData.gender[gender].total_votes,
-                        vote_results: roleData.gender[gender].vote_results
-                    }
-                });
-            });
-            formattedResults.push(roleEntry);
-        });
-
-        // Return the formatted results sorted by role_id
-        res.json({ success: true, results: formattedResults });
-    } catch (error) {
-        console.error('Error fetching vote results:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-
-});
-
-
-
-// Route for updating SPL roles in the login table
-app.post('/api/updatingsplroles', async(req, res) => {
-    const { roll_no, role_id } = req.body;
-
-    try {
-        console.log('API updatingsroles requested');
-        if (!roll_no || !role_id) {
-            return res.status(400).json({ error: 'Roll number and role ID are required in the request body' });
-        }
-
-        // Query to update SPL role in the login table
-        const updateQuery = `
-            UPDATE login
-            SET spl_role = ?
-            WHERE roll_no = ?
-        `;
-
-        const [result] = await pool.execute(updateQuery, [role_id, roll_no]);
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'User with the provided roll number not found' });
-        }
-
-        res.json({ success: true, message: 'SPL role updated successfully' });
-    } catch (error) {
-        console.error('Error updating SPL role:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
 
 
 
