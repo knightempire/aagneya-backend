@@ -38,8 +38,8 @@ const {
 
 const dbConfig = {
     host: DB_HOST,
-    // port: 10379,
-    port: 3306,
+    port: 19516,
+    // port: 3306,
     user: DB_USER,
     password: DB_PASSWORD,
     database: DB_DATABASE,
@@ -308,7 +308,7 @@ app.post('/api/login', async(req, res) => {
 
 
 // Route for user registration
-app.post('/api/register', [authenticateToken, async(req, res) => {
+app.post('/api/register', async(req, res) => {
     const { roll_no, date, role_id, sport_id, year } = req.body;
 
     try {
@@ -341,7 +341,7 @@ app.post('/api/register', [authenticateToken, async(req, res) => {
         console.error('Error during registration:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
 
