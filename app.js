@@ -108,13 +108,11 @@ app.use(session({
 
 //function to create token
 const createtoken = (req, res, rows) => {
-    // Assuming rows contain user data with a username field
-    const username = rows[0].username;
+    // Assuming rows contain user data with a roll_no field
+    const roll_no = rows[0].roll_no;
 
-    // Sign the token with the username instead of email
-    const token = jwt.sign({ username: username }, JWT_SECRET, {
-
-
+    // Sign the token with the roll_no instead of email
+    const token = jwt.sign({ roll_no: roll_no }, JWT_SECRET, {
         expiresIn: JWT_EXPIRY,
     });
 
@@ -129,18 +127,19 @@ const createtoken = (req, res, rows) => {
 
 
 
+
 //function to verify token
 // Middleware to authenticate token and retrieve user data
-// async function getUserDataByUsername(username) {
+// async function getUserDataByroll_no(roll_no) {
 //     try {
-//         // Query the database to find the user by username
-//         const user = await User.findOne({ username });
+//         // Query the database to find the user by roll_no
+//         const user = await User.findOne({ roll_no });
 
 //         // If user is found, return user data
 //         if (user) {
 //             return {
 //                 id: user.id,
-//                 username: user.username,
+//                 roll_no: user.roll_no,
 //                 email: user.email,
 //                 // Add other user data properties as needed
 //             };
@@ -153,41 +152,26 @@ const createtoken = (req, res, rows) => {
 //     }
 // }
 
-const authenticateToken = async(req, res, next) => {
+const authenticateToken = (req, res, next) => {
     try {
         // Check if Authorization header exists
         if (!req.headers.authorization) {
-            return res.status(401).json({ error: 'Unauthorized' }); // Return 401 Unauthorized status
+            return res.redirect('#'); // Redirect to login page
         }
 
         // Retrieve token from request headers and split it
         const token = req.headers.authorization.split(' ')[1];
-        console.log("Token:", token); // Print token value
+        // console.log("Token:", token); // Print token value
 
         // Verify token
-        jwt.verify(token, "aagenya@1234", async(err, decodedToken) => {
+        jwt.verify(token, JWT_SECRET, (err, decoded) => {
             if (err) {
                 console.error('Authentication error:', err.message);
                 // Token is invalid or expired, send 401 Unauthorized response to client
                 return res.status(401).json({ error: 'Unauthorized' });
             } else {
-                console.log('Decoded Token:', decodedToken); // Print decoded token data
-
-                // Decode the token to get the username
-                const username = decodedToken.username;
-                console.log(username)
-
-                // Retrieve user data from the database based on the username
-                const userData = await getUserDataByUsername(username);
-
-                if (!userData) {
-                    // User not found in the database, send 401 Unauthorized response
-                    console.error('User not found');
-                    return res.status(401).json({ error: 'Unauthorized' });
-                }
-
-                // Set user information in request object
-                req.user = userData;
+                req.user = decoded; // Set decoded information in request object
+                console.log('Decoded user:', decoded);
                 next(); // Proceed to next middleware
             }
         });
@@ -200,28 +184,33 @@ const authenticateToken = async(req, res, next) => {
 
 
 
-//decoding the token
 app.post('/api/decodeToken', async(req, res) => {
     console.log('api decode requested');
     try {
         // Extract the token from the request body
         const { token } = req.body;
 
-        console.log(token)
+
 
         // Verify and decode the token
         const decodedToken = jwt.verify(token, JWT_SECRET);
-        // console.log(decodedToken)
 
-        // Extract username from decoded token
-        const { username } = decodedToken;
+
+        // Extract roll_no from decoded token
+        const { roll_no } = decodedToken;
+
+
+        // Check if roll_no is defined
+        if (!roll_no) {
+            return res.status(400).json({ error: 'roll_no not found in token' });
+        }
 
         // Get a connection from the pool
         const connection = await pool.getConnection();
 
         try {
-            // Query the database to retrieve user data based on username
-            const [rows] = await connection.execute('SELECT user_id,name,username FROM users WHERE username = ?', [username]);
+            // Query the database to retrieve user data based on roll_no
+            const [rows] = await connection.execute('SELECT roll_no,is_active,role_id ,spl_role FROM login WHERE roll_no = ?', [roll_no]);
 
             // Check if user exists in the database
             if (rows.length === 0) {
@@ -247,7 +236,6 @@ app.post('/api/decodeToken', async(req, res) => {
         res.status(400).json({ error: 'Failed to decode token' });
     }
 });
-
 
 
 // Route for login
@@ -284,6 +272,7 @@ app.post('/api/login', async(req, res) => {
             return res.status(400).json({ error: 'You are no longer an active user' });
         }
 
+        // Assuming you want to retrieve role_id from existingUser
         const { role_id } = existingUser[0];
 
         // Check if the roll number exists in the profile table
@@ -306,6 +295,7 @@ app.post('/api/login', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 
 
 
