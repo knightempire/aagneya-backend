@@ -284,6 +284,8 @@ app.post('/api/login', async(req, res) => {
             return res.status(400).json({ error: 'You are no longer an active user' });
         }
 
+        const {role_id}= existingUser[0];
+
         // Check if the roll number exists in the profile table
         const [existingProfile] = await pool.execute('SELECT * FROM profile WHERE roll_no = ?', [roll_no]);
         let profileExists = 0;
@@ -298,7 +300,7 @@ app.post('/api/login', async(req, res) => {
         console.log("Token:", token);
 
         // Send response
-        res.json({ isValid: true, profile: profileExists, token });
+        res.json({ isValid: true, profile: profileExists, token, role_id });
     } catch (error) {
         console.error('Error during login:', error);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -427,7 +429,7 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
 
 
 // API endpoint for adding a profile
-app.post('/addprofile', [authenticateToken, upload.single('photo'), async(req, res) => {
+app.post('/api/addprofile', [authenticateToken, upload.single('photo'), async(req, res) => {
     let { roll_no, name, email, sport_id, phone } = req.body;
 
     // Convert roll_no and phone to lowercase
