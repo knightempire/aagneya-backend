@@ -308,7 +308,7 @@ app.post('/api/login', async(req, res) => {
 
 
 // Route for user registration
-app.post('/api/register', async(req, res) => {
+app.post('/api/register', [authenticateToken, async(req, res) => {
     const { roll_no, date, role_id, sport_id, year } = req.body;
 
     try {
@@ -323,7 +323,7 @@ app.post('/api/register', async(req, res) => {
             return res.status(400).json({ error: 'User with the same roll number already exists' });
         }
 
-        // Set password to roll_no
+        // Set password to roll_nNo
         const password = roll_no;
 
         // Hash the password
@@ -341,13 +341,13 @@ app.post('/api/register', async(req, res) => {
         console.error('Error during registration:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 
 // Route for adding sports
-app.post('/api/addsports', async(req, res) => {
+app.post('/api/addsports', [authenticateToken, async(req, res) => {
     const { sport_name } = req.body;
 
     try {
@@ -375,10 +375,10 @@ app.post('/api/addsports', async(req, res) => {
         console.error('Error adding sport:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-})
+}])
 
 // API endpoint for displaying sports data
-app.get('/api/displaysports', async(req, res) => {
+app.get('/api/displaysports', [authenticateToken, async(req, res) => {
     try {
         console.log('API displaysports requested');
 
@@ -391,11 +391,11 @@ app.get('/api/displaysports', async(req, res) => {
         console.error('Error displaying sports data:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // Route for adding security information
-app.post('/api/addsecurity', async(req, res) => {
+app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
     let { roll_no, dob, hospital_born, school, fav_friend } = req.body;
 
     // Convert roll_no, hospital_born, school, and fav_friend to lowercase
@@ -423,11 +423,11 @@ app.post('/api/addsecurity', async(req, res) => {
         console.error('Error adding security information:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for adding a profile
-app.post('/addprofile', upload.single('photo'), async(req, res) => {
+app.post('/addprofile', [authenticateToken, upload.single('photo'), async(req, res) => {
     let { roll_no, name, email, sport_id, phone } = req.body;
 
     // Convert roll_no and phone to lowercase
@@ -456,10 +456,10 @@ app.post('/addprofile', upload.single('photo'), async(req, res) => {
         console.error("Error adding profile: ", error);
         res.status(500).json({ error: "Error adding profile." });
     }
-});
+}]);
 
 // API endpoint for verifying roll number and date of birth
-app.post('/api/verifyroleno', async(req, res) => {
+app.post('/api/verifyroleno', [authenticateToken, async(req, res) => {
     let { roll_no, dob } = req.body;
 
     roll_no = roll_no.toLowerCase(); // Convert roll_no to lowercase
@@ -483,11 +483,11 @@ app.post('/api/verifyroleno', async(req, res) => {
         console.error('Error verifying credentials:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for verifying security question answer
-app.post('/api/verifysecurity', async(req, res) => {
+app.post('/api/verifysecurity', [authenticateToken, async(req, res) => {
     const { roll_no, qa_id, qa_answer } = req.body;
 
     // Convert roll_no to lowercase
@@ -536,11 +536,11 @@ app.post('/api/verifysecurity', async(req, res) => {
         console.error('Error verifying security question answer:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for resetting password
-app.post('/api/resetpassword', async(req, res) => {
+app.post('/api/resetpassword', [authenticateToken, async(req, res) => {
     let { roll_no, new_password } = req.body;
 
     // Convert roll_no to lowercase
@@ -569,11 +569,11 @@ app.post('/api/resetpassword', async(req, res) => {
         console.error('Error resetting password:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for hard resetting password
-app.post('/api/hardresetpassword', async(req, res) => {
+app.post('/api/hardresetpassword', [authenticateToken, async(req, res) => {
     const { roll_no } = req.body;
 
     try {
@@ -601,12 +601,12 @@ app.post('/api/hardresetpassword', async(req, res) => {
         console.error('Error resetting password:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for deactivating a user
-app.post('/api/deactivateuser', async(req, res) => {
+app.post('/api/deactivateuser', [authenticateToken, async(req, res) => {
     let { roll_no } = req.body;
 
     // Convert roll_no to lowercase
@@ -631,12 +631,12 @@ app.post('/api/deactivateuser', async(req, res) => {
         console.error('Error deactivating user:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for changing a user's sport
-app.post('/api/changesport', async(req, res) => {
+app.post('/api/changesport', [authenticateToken, async(req, res) => {
     let { roll_no, sport_id } = req.body;
 
     // Convert roll_no to lowercase
@@ -661,11 +661,11 @@ app.post('/api/changesport', async(req, res) => {
         console.error('Error updating user sport:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for displaying roles data
-app.get('/api/displayroles', async(req, res) => {
+app.get('/api/displayroles', [authenticateToken, async(req, res) => {
     try {
         console.log('API displayroles requested');
 
@@ -678,12 +678,12 @@ app.get('/api/displayroles', async(req, res) => {
         console.error('Error displaying roles data:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for changing a user's role
-app.post('/api/changeroll', async(req, res) => {
+app.post('/api/changeroll', [authenticateToken, async(req, res) => {
     let { roll_no, role_id } = req.body;
 
     // Convert roll_no to lowercase
@@ -708,11 +708,11 @@ app.post('/api/changeroll', async(req, res) => {
         console.error('Error updating user role:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for displaying filtered members
-app.post('/api/displaymembersfilter', async(req, res) => {
+app.post('/api/displaymembersfilter', [authenticateToken, async(req, res) => {
     const { year, sport_id } = req.body;
 
     try {
@@ -764,12 +764,12 @@ app.post('/api/displaymembersfilter', async(req, res) => {
         console.error('Error displaying filtered members:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for updating profile year and concatenating new year with existing one
-app.post('/api/nextyear', async(req, res) => {
+app.post('/api/nextyear', [authenticateToken, async(req, res) => {
     let { roll_no, year } = req.body;
 
     // Convert roll_no to lowercase
@@ -801,14 +801,14 @@ app.post('/api/nextyear', async(req, res) => {
         console.error('Error updating year:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 
 
 // API endpoint for adding an event
-app.post('/api/addevent', async(req, res) => {
+app.post('/api/addevent', [authenticateToken, async(req, res) => {
     let { event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date } = req.body;
 
     // Convert event_name, event_description, place, and roll_no (created_by) to lowercase
@@ -830,12 +830,12 @@ app.post('/api/addevent', async(req, res) => {
         console.error('Error adding event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for event approval
-app.post('/api/eventapproval', async(req, res) => {
+app.post('/api/eventapproval', [authenticateToken, async(req, res) => {
     const { event_id, approval_date } = req.body;
 
     try {
@@ -857,11 +857,11 @@ app.post('/api/eventapproval', async(req, res) => {
         console.error('Error updating event approval status:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for adding an event by admin
-app.post('/api/adminaddevent', async(req, res) => {
+app.post('/api/adminaddevent', [authenticateToken, async(req, res) => {
     // Convert certain fields to lowercase before destructuring
     const { event_name, event_description, place, created_by, created_date, sport_id, date, time, entry_fee, is_team, no_of_prize, category, gender, form_link, last_date } = req.body;
 
@@ -878,12 +878,12 @@ app.post('/api/adminaddevent', async(req, res) => {
         console.error('Error adding event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for displaying approved event
-app.get('/api/displayevent', async(req, res) => {
+app.get('/api/displayevent', [authenticateToken, async(req, res) => {
     try {
         console.log('API displayevent requested');
 
@@ -897,13 +897,13 @@ app.get('/api/displayevent', async(req, res) => {
         console.error('Error displaying event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 
 // API endpoint for retrieving event created by a user
-app.post('/api/createdevent', async(req, res) => {
+app.post('/api/createdevent', [authenticateToken, async(req, res) => {
     const { roll_no } = req.body; // Get roll number from request body and convert to lowercase
     const rollNoLower = roll_no.toLowerCase();
 
@@ -920,12 +920,12 @@ app.post('/api/createdevent', async(req, res) => {
         console.error('Error retrieving created event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // API endpoint for updating an event
-app.post('/api/updateevent', async(req, res) => {
+app.post('/api/updateevent', [authenticateToken, async(req, res) => {
     const { event_id, event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place } = req.body;
 
     try {
@@ -985,11 +985,11 @@ app.post('/api/updateevent', async(req, res) => {
         console.error('Error updating event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // API endpoint for updating an event by admin
-app.post('/api/adminupdateevent', async(req, res) => {
+app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
     const { event_id, event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place } = req.body;
 
     try {
@@ -1038,12 +1038,12 @@ app.post('/api/adminupdateevent', async(req, res) => {
         console.error('Error updating event by admin:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Add Blog
-app.post('/api/addblog', async(req, res) => {
+app.post('/api/addblog', [authenticateToken, async(req, res) => {
     let { title, img_path, description, creation_date, approval_date, created_by } = req.body;
 
     // Convert necessary fields to lowercase
@@ -1063,10 +1063,10 @@ app.post('/api/addblog', async(req, res) => {
         console.error('Error adding blog:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Blog Approval
-app.post('/api/blogapproval', async(req, res) => {
+app.post('/api/blogapproval', [authenticateToken, async(req, res) => {
     const { blog_id, approval_date } = req.body;
 
     try {
@@ -1086,10 +1086,10 @@ app.post('/api/blogapproval', async(req, res) => {
         console.error('Error updating blog approval status:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Admin Add Blog
-app.post('/api/adminaddblog', async(req, res) => {
+app.post('/api/adminaddblog', [authenticateToken, async(req, res) => {
     const { title, img_path, description, created_by, creation_date, approval_date } = req.body;
 
     try {
@@ -1104,10 +1104,10 @@ app.post('/api/adminaddblog', async(req, res) => {
         console.error('Error adding blog:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Display Approved Blogs
-app.get('/api/displayblogs', async(req, res) => {
+app.get('/api/displayblogs', [authenticateToken, async(req, res) => {
     try {
         console.log('API displayblogs requested');
 
@@ -1119,10 +1119,10 @@ app.get('/api/displayblogs', async(req, res) => {
         console.error('Error displaying blogs:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Retrieve Created Blogs by Roll Number
-app.post('/api/createdblogs', async(req, res) => {
+app.post('/api/createdblogs', [authenticateToken, async(req, res) => {
     const { roll_no } = req.body;
     const rollNoLower = roll_no.toLowerCase();
 
@@ -1138,10 +1138,10 @@ app.post('/api/createdblogs', async(req, res) => {
         console.error('Error retrieving created blogs:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
-app.post('/api/updateblog', async(req, res) => {
+app.post('/api/updateblog', [authenticateToken, async(req, res) => {
     const { blog_id, title, img_path, description, creation_date, approval_date } = req.body;
 
     try {
@@ -1187,11 +1187,11 @@ app.post('/api/updateblog', async(req, res) => {
         console.error('Error updating blog:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 // Admin Update Blog
-app.post('/api/adminupdateblog', async(req, res) => {
+app.post('/api/adminupdateblog', [authenticateToken, async(req, res) => {
     const { blog_id, title, img_path, description, creation_date, approval_date } = req.body;
 
     try {
@@ -1222,12 +1222,12 @@ app.post('/api/adminupdateblog', async(req, res) => {
         console.error('Error updating blog by admin:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Add Achievement
-app.post('/api/addachievement', async(req, res) => {
+app.post('/api/addachievement', [authenticateToken, async(req, res) => {
     let { description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
 
     // Convert necessary fields to lowercase
@@ -1247,10 +1247,10 @@ app.post('/api/addachievement', async(req, res) => {
         console.error('Error adding achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Achievement Approval
-app.post('/api/achievementapproval', async(req, res) => {
+app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
     const { achievement_id } = req.body;
 
     try {
@@ -1270,10 +1270,10 @@ app.post('/api/achievementapproval', async(req, res) => {
         console.error('Error updating achievement approval status:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Admin Add Achievement
-app.post('/api/adminaddachievement', async(req, res) => {
+app.post('/api/adminaddachievement', [authenticateToken, async(req, res) => {
     let { description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
 
     // Convert necessary fields to lowercase
@@ -1293,10 +1293,10 @@ app.post('/api/adminaddachievement', async(req, res) => {
         console.error('Error adding achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Display Approved Achievements
-app.get('/api/displayachievements', async(req, res) => {
+app.get('/api/displayachievements', [authenticateToken, async(req, res) => {
     try {
         console.log('API displayachievements requested');
 
@@ -1308,10 +1308,10 @@ app.get('/api/displayachievements', async(req, res) => {
         console.error('Error displaying achievements:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Retrieve Created Achievements by Roll Number
-app.post('/api/createdachievements', async(req, res) => {
+app.post('/api/createdachievements', [authenticateToken, async(req, res) => {
     const { roll_no } = req.body;
     const rollNoLower = roll_no.toLowerCase();
 
@@ -1327,10 +1327,10 @@ app.post('/api/createdachievements', async(req, res) => {
         console.error('Error retrieving created achievements:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Update Achievement
-app.post('/api/updateachievement', async(req, res) => {
+app.post('/api/updateachievement', [authenticateToken, async(req, res) => {
     const { achievement_id, description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
 
     try {
@@ -1380,10 +1380,10 @@ app.post('/api/updateachievement', async(req, res) => {
         console.error('Error updating achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 // Admin Update Achievement
-app.post('/api/adminupdateachievement', async(req, res) => {
+app.post('/api/adminupdateachievement', [authenticateToken, async(req, res) => {
     const { achievement_id, description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
 
     try {
@@ -1419,12 +1419,12 @@ app.post('/api/adminupdateachievement', async(req, res) => {
         console.error('Error updating achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Route for registering candidates for an election
-app.post('/api/electionregister', async(req, res) => {
+app.post('/api/electionregister', [authenticateToken, async(req, res) => {
     const { election_id, roll_no, role_id } = req.body;
 
     try {
@@ -1456,12 +1456,12 @@ app.post('/api/electionregister', async(req, res) => {
         console.error('Error registering candidate:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Route for opening registration for an election
-app.post('/api/electionregisteropen', async(req, res) => {
+app.post('/api/electionregisteropen', [authenticateToken, async(req, res) => {
     const { election_id } = req.body;
 
     try {
@@ -1490,12 +1490,12 @@ app.post('/api/electionregisteropen', async(req, res) => {
         console.error('Error opening registration for election:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Route for closing registration for an election
-app.post('/api/electionregisterclose', async(req, res) => {
+app.post('/api/electionregisterclose', [authenticateToken, async(req, res) => {
     const { election_id } = req.body;
 
     try {
@@ -1525,12 +1525,12 @@ app.post('/api/electionregisterclose', async(req, res) => {
         console.error('Error closing registration for election:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Route for opening voting for an election
-app.post('/api/electionvoteopen', async(req, res) => {
+app.post('/api/electionvoteopen', [authenticateToken, async(req, res) => {
     const { election_id } = req.body;
 
     try {
@@ -1560,12 +1560,12 @@ app.post('/api/electionvoteopen', async(req, res) => {
         console.error('Error opening voting for election:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 // Route for closing voting for an election
-app.post('/api/electionvoteclose', async(req, res) => {
+app.post('/api/electionvoteclose', [authenticateToken, async(req, res) => {
     const { election_id } = req.body;
 
     try {
@@ -1595,13 +1595,13 @@ app.post('/api/electionvoteclose', async(req, res) => {
         console.error('Error closing voting for election:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
 
 // Route for voting
-app.post('/api/vote', async(req, res) => {
+app.post('/api/vote', [authenticateToken, async(req, res) => {
     const { election_id, role_id, roll_no, candidate_id, gender } = req.body;
 
     try {
@@ -1643,7 +1643,7 @@ app.post('/api/vote', async(req, res) => {
         console.error('Error recording vote:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
@@ -1651,7 +1651,7 @@ app.post('/api/vote', async(req, res) => {
 
 
 // Route for getting vote results for a specific election, structured by role_id
-app.post('/api/voteresult', async(req, res) => {
+app.post('/api/voteresult', [authenticateToken, async(req, res) => {
     const { election_id } = req.body;
 
     try {
@@ -1771,12 +1771,13 @@ app.post('/api/voteresult', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 
-});
+
+}]);
 
 
 
 // Route for updating SPL roles in the login table
-app.post('/api/updatingsplroles', async(req, res) => {
+app.post('/api/updatingsplroles', [authenticateToken, async(req, res) => {
     const { roll_no, role_id } = req.body;
 
     try {
@@ -1803,7 +1804,20 @@ app.post('/api/updatingsplroles', async(req, res) => {
         console.error('Error updating SPL role:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
