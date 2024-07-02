@@ -308,6 +308,8 @@ app.post('/api/login', async(req, res) => {
 });
 
 
+
+
 // Route for user registration
 app.post('/api/register', async(req, res) => {
     const { roll_no, date, role_id, sport_id, year } = req.body;
