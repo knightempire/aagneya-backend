@@ -217,7 +217,7 @@ app.post('/api/decodeToken', [authenticateToken, async(req, res) => {
             const userData = rows[0];
 
             // Determine if profile exists
-            userData.profile = rows[0].name ? 1 : 0;
+            userData.profile = rows[0].name && rows[0].name !== 'Unknown' ? 1 : 0;
             console.log(userData.profile)
 
             // Set name to 'User' if it's null or undefined
@@ -283,15 +283,12 @@ app.post('/api/login', async(req, res) => {
         const [existingProfile] = await pool.execute('SELECT * FROM profile WHERE roll_no = ?', [roll_no]);
         let profileExists = 0;
 
+        console.log(existingProfile)
         if (existingProfile.length > 0) {
-            console.log(existingProfile.name)
-                // If the roll number exists in the profile table, set profileExists to 1
+            // If the roll number exists in the profile table, set profileExists to 1
             const profileData = existingProfile[0];
-
-            if (existingProfile.name == "") {
+            if (profileData.name && profileData.name !== "Unknown") {
                 profileExists = 1;
-            } else {
-                profileExists = 0;
             }
         }
 
