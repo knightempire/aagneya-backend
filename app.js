@@ -345,8 +345,11 @@ app.post('/api/addsports', [authenticateToken, async(req, res) => {
     try {
         console.log('API addsports requested');
 
+        // Convert sport_name to lowercase
+        const lowercaseSportName = sport_name.toLowerCase();
+
         // Check if the sport already exists (case-insensitive)
-        const [existingSport] = await pool.execute('SELECT * FROM sports WHERE LOWER(sport_name) = LOWER(?)', [sport_name]);
+        const [existingSport] = await pool.execute('SELECT * FROM sports WHERE LOWER(sport_name) = ?', [lowercaseSportName]);
 
         if (existingSport.length > 0) {
             return res.status(400).json({ error: 'Sport already exists' });
@@ -356,10 +359,10 @@ app.post('/api/addsports', [authenticateToken, async(req, res) => {
         const [maxSportId] = await pool.execute('SELECT MAX(sport_id) AS maxSportId FROM sports');
 
         // Calculate the next sport_id
-        const nextSportId = maxSportId[0].maxSportId + 1;
+        const nextSportId = maxSportId[0].maxSportId + 1 || 1; // Handle the case where there are no existing sports
 
-        // Insert new sport into the sports table with the calculated sport_id
-        const result = await pool.execute('INSERT INTO sports (sport_id, sport_name) VALUES (?, ?)', [nextSportId, sport_name]);
+        // Insert new sport into the sports table with the calculated sport_id and lowercase sport_name
+        const result = await pool.execute('INSERT INTO sports (sport_id, sport_name) VALUES (?, ?)', [nextSportId, lowercaseSportName]);
 
         // Send response
         res.json({ success: true, message: 'Sport added successfully' });
@@ -367,7 +370,7 @@ app.post('/api/addsports', [authenticateToken, async(req, res) => {
         console.error('Error adding sport:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}])
+}]);
 
 // API endpoint for displaying sports data
 app.get('/api/displaysports', [authenticateToken, async(req, res) => {
@@ -375,7 +378,7 @@ app.get('/api/displaysports', [authenticateToken, async(req, res) => {
         console.log('API displaysports requested');
 
         // Retrieve data from the sports table
-        const [sportsData] = await pool.execute('SELECT * FROM sports');
+        const [sportsData] = await pool.execute('SELECT * FROM sports ORDER BY sport_name');
 
         // Send response with the retrieved sports data
         res.json({ success: true, sports: sportsData });
