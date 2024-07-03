@@ -217,8 +217,11 @@ app.post('/api/decodeToken', [authenticateToken, async(req, res) => {
             const userData = rows[0];
 
             // Determine if profile exists
-            userData.profile = rows[0].name !== null ? 1 : 0;
-            userData.name = rows[0].name !== null ? rows[0].name : 'User'; // Set name to 'undefined' if it's null
+            userData.profile = rows[0].name ? 1 : 0;
+            console.log(userData.profile)
+
+            // Set name to 'User' if it's null or undefined
+            userData.name = rows[0].name || 'User';
 
             console.log('decoded token');
 
@@ -281,8 +284,15 @@ app.post('/api/login', async(req, res) => {
         let profileExists = 0;
 
         if (existingProfile.length > 0) {
-            // If the roll number exists in the profile table, set profileExists to 1
-            profileExists = 1;
+            console.log(existingProfile.name)
+                // If the roll number exists in the profile table, set profileExists to 1
+            const profileData = existingProfile[0];
+
+            if (existingProfile.name == "") {
+                profileExists = 1;
+            } else {
+                profileExists = 0;
+            }
         }
 
         // Call function to create token
