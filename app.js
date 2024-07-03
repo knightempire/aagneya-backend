@@ -308,7 +308,7 @@ app.post('/api/login', async(req, res) => {
 
 
 // Route for user registration
-app.post('/api/register', async(req, res) => {
+app.post('/api/register', [authenticateToken, async(req, res) => {
     const { roll_no, date, role_id, sport_id, year } = req.body;
     try {
         console.log('API registration requested');
@@ -333,7 +333,7 @@ app.post('/api/register', async(req, res) => {
         console.error('Error during registration:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
+}]);
 
 
 
@@ -602,7 +602,7 @@ app.post('/api/hardresetpassword', [authenticateToken, async(req, res) => {
 
 // API endpoint for deactivating a user
 app.post('/api/deactivateuser', [authenticateToken, async(req, res) => {
-    let { roll_no } = req.body;
+    const { roll_no } = req.body;
 
     // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
@@ -629,20 +629,19 @@ app.post('/api/deactivateuser', [authenticateToken, async(req, res) => {
 }]);
 
 
-
-// API endpoint for changing a user's sport
-app.post('/api/changesport', [authenticateToken, async(req, res) => {
-    let { roll_no, sport_id } = req.body;
+// API endpoint for deactivating a user
+app.post('/api/activateuser', [authenticateToken, async(req, res) => {
+    const { roll_no } = req.body;
 
     // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
 
     try {
-        console.log('API changesport requested');
+        console.log('API deactivateuser requested');
 
-        // Update sport_id for the user with the provided roll number
-        const updateQuery = 'UPDATE profile SET sport_id = ? WHERE LOWER(roll_no) = ?';
-        const [updateResult] = await pool.execute(updateQuery, [sport_id, roll_no]);
+        // Update is_active to 0 for the user with the provided roll number
+        const updateQuery = 'UPDATE login SET is_active = 1 WHERE LOWER(roll_no) = ?';
+        const [updateResult] = await pool.execute(updateQuery, [roll_no]);
 
         // Check if any rows were affected by the update
         if (updateResult.affectedRows === 0) {
@@ -651,12 +650,49 @@ app.post('/api/changesport', [authenticateToken, async(req, res) => {
         }
 
         // Send response
-        res.json({ success: true, message: 'User sport updated successfully' });
+        res.json({ success: true, message: 'User activated successfully' });
     } catch (error) {
-        console.error('Error updating user sport:', error);
+        console.error('Error deactivating user:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
+app.put('/api/updateuser', async(req, res) => {
+    let { roll_no, sport_id, role_id, gender, year } = req.body;
+
+    // Convert roll_no to lowercase
+    roll_no = roll_no.toLowerCase();
+
+    try {
+        console.log('API updateusers requested');
+
+        // Update profile table
+        const updateProfileQuery = 'UPDATE profile SET sport_id = ?,gender = ?, year = ? WHERE LOWER(roll_no) = ?';
+        const [updateProfileResult] = await pool.execute(updateProfileQuery, [sport_id, gender, year, roll_no]);
+
+        // Check if any rows were affected by the update in profile table
+        if (updateProfileResult.affectedRows === 0) {
+            console.log('User not found in profile table');
+            return res.status(404).json({ error: 'User not found in profile table' });
+        }
+
+        // Update login table
+        const updateLoginQuery = 'UPDATE login SET role_id = ? WHERE LOWER(roll_no) = ?';
+        const [updateLoginResult] = await pool.execute(updateLoginQuery, [role_id, roll_no]);
+
+        // Check if any rows were affected by the update in login table
+        if (updateLoginResult.affectedRows === 0) {
+            console.log('User not found in login table');
+            return res.status(404).json({ error: 'User not found in login table' });
+        }
+
+        // Send success response
+        res.json({ success: true, message: 'User profile updated ' });
+    } catch (error) {
+        console.error('Error updating user profile:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 // API endpoint for displaying roles data
@@ -677,33 +713,90 @@ app.get('/api/displayroles', [authenticateToken, async(req, res) => {
 
 
 
-// API endpoint for changing a user's role
-app.post('/api/changeroll', [authenticateToken, async(req, res) => {
-    let { roll_no, role_id } = req.body;
 
-    // Convert roll_no to lowercase
-    roll_no = roll_no.toLowerCase();
 
+// API endpoint for displaying members with role_name and sport_name
+app.get('/api/displaymem', authenticateToken, async(req, res) => {
     try {
-        console.log('API changeroll requested');
+        // Query to join profile, login, roles, and sports tables
+        const [rows, fields] = await pool.query(`
+            SELECT 
+                profile.roll_no, 
+                profile.name, 
+                profile.photo_path, 
+                profile.email, 
+                sports.sport_name AS sport_name,
+                profile.year, 
+                profile.phone, 
+                profile.gender, 
+                login.is_active, 
+                login.date,
+                login.role_id,
+                roles.role_name AS role_name,
+                login.spl_role,
+                spl_role_names.role_name AS spl_role_name
+            FROM 
+                profile
+            INNER JOIN 
+                login ON profile.roll_no = login.roll_no
+            LEFT JOIN
+                roles ON login.role_id = roles.role_id
+            LEFT JOIN
+                roles AS spl_role_names ON login.spl_role = spl_role_names.role_id
+            LEFT JOIN
+                sports ON profile.sport_id = sports.sport_id
+        `);
 
-        // Update role_id for the user with the provided roll number
-        const updateQuery = 'UPDATE login SET role_id = ? WHERE LOWER(roll_no) = ?';
-        const [updateResult] = await pool.execute(updateQuery, [role_id, roll_no]);
-
-        // Check if any rows were affected by the update
-        if (updateResult.affectedRows === 0) {
-            console.log('User not found');
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Send response
-        res.json({ success: true, message: 'User role updated successfully' });
+        res.json(rows); // Send the result as JSON response
     } catch (error) {
-        console.error('Error updating user role:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('Error fetching data:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-}]);
+});
+
+// API endpoint for displaying members with role_name and sport_name for a specific role_no
+app.post('/api/displaymem', authenticateToken, async(req, res) => {
+    try {
+        const { roll_no } = req.body; // Assuming role_no is passed in the request body
+
+        // Query to join profile, login, roles, and sports tables filtered by roll_no
+        const [rows, fields] = await pool.query(`
+            SELECT 
+                profile.roll_no, 
+                profile.name, 
+                profile.photo_path, 
+                profile.email, 
+                sports.sport_name AS sport_name,
+                profile.year, 
+                profile.phone, 
+                profile.gender, 
+                login.is_active, 
+                login.date,
+                login.role_id,
+                roles.role_name AS role_name,
+                login.spl_role,
+                spl_role_names.role_name AS spl_role_name
+            FROM 
+                profile
+            INNER JOIN 
+                login ON profile.roll_no = login.roll_no
+            LEFT JOIN
+                roles ON login.role_id = roles.role_id
+            LEFT JOIN
+                roles AS spl_role_names ON login.spl_role = spl_role_names.role_id
+            LEFT JOIN
+                sports ON profile.sport_id = sports.sport_id
+            WHERE 
+                profile.roll_no = ?
+        `, [roll_no]);
+
+        res.json(rows); // Send the result as JSON response
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 
 
 // API endpoint for displaying filtered members
