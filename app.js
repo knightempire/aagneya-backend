@@ -171,7 +171,7 @@ const authenticateToken = (req, res, next) => {
                 return res.status(401).json({ error: 'Unauthorized' });
             } else {
                 req.user = decoded; // Set decoded information in request object
-                console.log('Decoded user:', decoded);
+                // console.log('Decoded user:', decoded);
                 next(); // Proceed to next middleware
             }
         });
@@ -184,21 +184,17 @@ const authenticateToken = (req, res, next) => {
 
 
 
-app.post('/api/decodeToken', async(req, res) => {
+app.post('/api/decodeToken', [authenticateToken, async(req, res) => {
     console.log('api decode requested');
     try {
         // Extract the token from the request body
         const { token } = req.body;
 
-
-
         // Verify and decode the token
         const decodedToken = jwt.verify(token, JWT_SECRET);
 
-
         // Extract roll_no from decoded token
         const { roll_no } = decodedToken;
-
 
         // Check if roll_no is defined
         if (!roll_no) {
@@ -210,7 +206,7 @@ app.post('/api/decodeToken', async(req, res) => {
 
         try {
             // Query the database to retrieve user data based on roll_no
-            const [rows] = await connection.execute('SELECT roll_no,is_active,role_id ,spl_role FROM login WHERE roll_no = ?', [roll_no]);
+            const [rows] = await connection.execute('SELECT l.roll_no, l.is_active, l.role_id, l.spl_role, p.name FROM login l LEFT JOIN profile p ON l.roll_no = p.roll_no WHERE l.roll_no = ?', [roll_no]);
 
             // Check if user exists in the database
             if (rows.length === 0) {
@@ -219,6 +215,11 @@ app.post('/api/decodeToken', async(req, res) => {
 
             // Get the user data from the query results
             const userData = rows[0];
+
+            // Determine if profile exists
+            userData.profile = rows[0].name !== null ? 1 : 0;
+            userData.name = rows[0].name !== null ? rows[0].name : 'User'; // Set name to 'undefined' if it's null
+
             console.log('decoded token');
 
             // Send user data back to the client
@@ -235,7 +236,7 @@ app.post('/api/decodeToken', async(req, res) => {
         console.error('Error decoding token:', error.message);
         res.status(400).json({ error: 'Failed to decode token' });
     }
-});
+}]);
 
 
 // Route for login
@@ -300,41 +301,6 @@ app.post('/api/login', async(req, res) => {
 
 
 
-// Route for user registration
-app.post('/api/register', async(req, res) => {
-    const { roll_no, date, role_id, sport_id, year } = req.body;
-
-    try {
-        console.log('API registration requested');
-
-        // Check if the roll number already exists (case-insensitive check)
-        const [existingUser] = await pool.execute('SELECT * FROM login WHERE LOWER(roll_no) = LOWER(?)', [roll_no]);
-
-        // Check if any rows were returned
-        if (existingUser.length > 0) {
-            console.log('User with the same roll number already exists');
-            return res.status(400).json({ error: 'User with the same roll number already exists' });
-        }
-
-        // Set password to roll_nNo
-        const password = roll_no;
-
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Insert new user into the login table
-        const loginResult = await pool.execute('INSERT INTO login (roll_no, password, is_active, date, role_id) VALUES (?, ?, ?, ?, ?)', [roll_no, hashedPassword, 1, date, role_id]);
-
-        // Insert sport_id and year into the profile table
-        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id, year) VALUES (?, ?, ?)', [roll_no, sport_id, year]);
-
-        // Send response
-        res.json({ success: true, message: 'User registered successfully' });
-    } catch (error) {
-        console.error('Error during registration:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
 
 
 
