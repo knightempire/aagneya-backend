@@ -310,7 +310,33 @@ app.post('/api/login', async(req, res) => {
 
 
 
-
+// Route for user registration
+app.post('/api/register', async(req, res) => {
+    const { roll_no, date, role_id, sport_id, year } = req.body;
+    try {
+        console.log('API registration requested');
+        // Check if the roll number already exists (case-insensitive check)
+        const [existingUser] = await pool.execute('SELECT * FROM login WHERE LOWER(roll_no) = LOWER(?)', [roll_no]);
+        // Check if any rows were returned
+        if (existingUser.length > 0) {
+            console.log('User with the same roll number already exists');
+            return res.status(400).json({ error: 'User with the same roll number already exists' });
+        }
+        // Set password to roll_nNo
+        const password = roll_no;
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        // Insert new user into the login table
+        const loginResult = await pool.execute('INSERT INTO login (roll_no, password, is_active, date, role_id) VALUES (?, ?, ?, ?, ?)', [roll_no, hashedPassword, 1, date, role_id]);
+        // Insert sport_id and year into the profile table
+        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id, year) VALUES (?, ?, ?)', [roll_no, sport_id, year]);
+        // Send response
+        res.json({ success: true, message: 'User registered successfully' });
+    } catch (error) {
+        console.error('Error during registration:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 
