@@ -602,7 +602,7 @@ app.post('/api/hardresetpassword', [authenticateToken, async(req, res) => {
 
 // API endpoint for deactivating a user
 app.post('/api/deactivateuser', [authenticateToken, async(req, res) => {
-    const { roll_no } = req.body;
+    let { roll_no } = req.body;
 
     // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
@@ -631,7 +631,7 @@ app.post('/api/deactivateuser', [authenticateToken, async(req, res) => {
 
 // API endpoint for deactivating a user
 app.post('/api/activateuser', [authenticateToken, async(req, res) => {
-    const { roll_no } = req.body;
+    let { roll_no } = req.body;
 
     // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
@@ -1003,21 +1003,40 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
 
 
 
-
-// API endpoint for retrieving event created by a user
 app.post('/api/createdevent', [authenticateToken, async(req, res) => {
-    const { roll_no } = req.body; // Get roll number from request body and convert to lowercase
-    const rollNoLower = roll_no.toLowerCase();
-
     try {
+        const { sport_name } = req.body;
         console.log('API createdevent requested');
 
-        // Retrieve event created by the specified user from the profile table
-        const selectQuery = 'SELECT * FROM profile WHERE created_by = ?';
-        const [createdevent] = await pool.execute(selectQuery, [rollNoLower]);
+        // Step 1: Retrieve sport_id from sports table based on sport_name from request body
+        const sportQuery = `
+            SELECT sport_id
+            FROM sports
+            WHERE sport_name = ?
+        `;
+        const [sportResult] = await pool.execute(sportQuery, [sport_name]);
+        const sport_id = sportResult[0].sport_id;
 
-        // Send response with the created event
-        res.json({ success: true, createdevent });
+        // Step 2: Retrieve events associated with the sport_id
+        const eventQuery = `
+        SELECT e.*, p.roll_no, p.name, p.email , p.photo_path
+        FROM event e
+        JOIN profile p ON e.created_by = p.roll_no
+        WHERE e.sport_id = ?
+    `;
+
+        const [events] = await pool.execute(eventQuery, [sport_id]);
+
+        // Construct response object
+        const responseData = {
+            success: true,
+            sport_name: sport_name,
+            events: events,
+        };
+
+        // Send response with all data in a single JSON object
+        res.json(responseData);
+
     } catch (error) {
         console.error('Error retrieving created event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
