@@ -907,8 +907,8 @@ app.post('/api/addevent', [authenticateToken, async(req, res) => {
 
     try {
 
-
-        // Query to get sport_id from sports table based on sport_name
+        console.log("api add event requested")
+            // Query to get sport_id from sports table based on sport_name
         const getSportIdQuery = `SELECT sport_id FROM sports WHERE sport_name = ?`;
         const [rows, fields] = await pool.execute(getSportIdQuery, [sport_name]);
 
@@ -962,26 +962,40 @@ app.post('/api/eventapproval', [authenticateToken, async(req, res) => {
 }]);
 
 
-// API endpoint for adding an event by admin
-app.post('/api/adminaddevent', [authenticateToken, async(req, res) => {
-    // Convert certain fields to lowercase before destructuring
-    const { event_name, event_description, place, created_by, created_date, sport_id, date, time, entry_fee, is_team, no_of_prize, category, gender, form_link, last_date } = req.body;
+
+
+app.post('/api/adminaddevent', authenticateToken, async(req, res) => {
+    let { event_name, sport_name, date, time, entry_fee, is_team, event_description, no_of_prizes, category, gender, form_link, last_date, location, roll_no, created_date } = req.body;
+
+    // Convert fields to lowercase if needed
+    event_name = event_name.toLowerCase();
+    event_description = event_description.toLowerCase();
+    location = location.toLowerCase();
+    roll_no = roll_no.toLowerCase();
+
 
     try {
-        console.log('API adminaddevent requested');
 
-        // Insert new event into the event table with approval_status = 1
-        const insertQuery = `INSERT INTO event (event_name, sport_id, date, time, place, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await pool.execute(insertQuery, [event_name.toLowerCase(), sport_id, date, time, place.toLowerCase(), entry_fee, is_team, event_description.toLowerCase(), no_of_prize, category, gender, form_link, last_date, created_by.toLowerCase(), created_date, 1]);
+        console.log('Api admin add event requested');
+
+        const insertQuery = `
+            INSERT INTO event 
+                (event_name, sport_id, event_date, event_time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, created_by, created_date, approval_status, approval_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const result = await pool.execute(insertQuery, [event_name, sport_name, date, time, entry_fee, is_team, event_description, no_of_prizes, category, gender, form_link, last_date, location, roll_no, created_date, 1, created_date]);
+        console.log('Event added successfully:', event_name);
 
         // Send response
         res.json({ success: true, message: 'Event added successfully' });
     } catch (error) {
         console.error('Error adding event:', error);
+        if (error.sqlMessage) {
+            console.error('SQL Error:', error.sqlMessage);
+        }
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
-
+});
 
 
 // API endpoint for displaying approved event
@@ -1017,13 +1031,13 @@ app.post('/api/createdevent', [authenticateToken, async(req, res) => {
         const [sportResult] = await pool.execute(sportQuery, [sport_name]);
         const sport_id = sportResult[0].sport_id;
 
-        // Step 2: Retrieve events associated with the sport_id
+        // Step 2: Retrieve events associated with the sport_id where approval_status = 0
         const eventQuery = `
-        SELECT e.*, p.roll_no, p.name, p.email , p.photo_path
-        FROM event e
-        JOIN profile p ON e.created_by = p.roll_no
-        WHERE e.sport_id = ?
-    `;
+            SELECT e.*, p.roll_no, p.name, p.email, p.photo_path
+            FROM event e
+            JOIN profile p ON e.created_by = p.roll_no
+            WHERE e.sport_id = ? AND e.approval_status = 0
+        `;
 
         const [events] = await pool.execute(eventQuery, [sport_id]);
 
@@ -1043,6 +1057,78 @@ app.post('/api/createdevent', [authenticateToken, async(req, res) => {
     }
 }]);
 
+
+
+app.post('/api/createdeventhist', [authenticateToken, async(req, res) => {
+    try {
+        const { sport_name } = req.body;
+        console.log('API createdeventhist requested');
+
+        // Step 1: Retrieve sport_id from sports table based on sport_name from request body
+        const sportQuery = `
+            SELECT sport_id
+            FROM sports
+            WHERE sport_name = ?
+        `;
+        const [sportResult] = await pool.execute(sportQuery, [sport_name]);
+        const sport_id = sportResult[0].sport_id;
+
+        // Step 2: Retrieve historical events associated with the sport_id where approval_status != 0
+        const eventQuery = `
+            SELECT e.*, p.roll_no, p.name, p.email, p.photo_path
+            FROM event e
+            JOIN profile p ON e.created_by = p.roll_no
+            WHERE e.sport_id = ? AND e.approval_status != 0
+        `;
+
+        const [events] = await pool.execute(eventQuery, [sport_id]);
+
+        // Construct response object
+        const responseData = {
+            success: true,
+            sport_name: sport_name,
+            events: events,
+        };
+
+        // Send response with all data in a single JSON object
+        res.json(responseData);
+
+    } catch (error) {
+        console.error('Error retrieving created event history:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+app.get('/api/showingevents', authenticateToken, async(req, res) => {
+    try {
+        console.log('API showingevents requested');
+
+        // Step 1: Retrieve events with approval_status = 0 and join with profile table
+        const eventQuery = `
+            SELECT e.*, p.roll_no, p.name AS profile_name, p.email, p.photo_path, s.sport_name
+            FROM event e
+            JOIN profile p ON e.created_by = p.roll_no
+            JOIN sports s ON e.sport_id = s.sport_id
+            WHERE e.approval_status = 0
+        `;
+
+        const [events] = await pool.execute(eventQuery);
+
+        // Step 2: Construct response object
+        const responseData = {
+            success: true,
+            events: events,
+        };
+
+        // Step 3: Send response with all data in a single JSON object
+        res.json(responseData);
+
+    } catch (error) {
+        console.error('Error retrieving showing events:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 // API endpoint for updating an event
