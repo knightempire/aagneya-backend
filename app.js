@@ -954,13 +954,38 @@ app.post('/api/eventapproval', [authenticateToken, async(req, res) => {
         }
 
         // Send response
-        res.json({ success: true, message: 'Event approval status updated successfully' });
+        res.json({ success: true, message: 'Event approved' });
     } catch (error) {
         console.error('Error updating event approval status:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
 
+
+// API endpoint for event approval
+app.post('/api/unapproval', [authenticateToken, async(req, res) => {
+    const { event_id, approval_date } = req.body;
+
+    try {
+        console.log('API event unapproval requested');
+
+        // Set approval_status to 1 and update approval_date
+        const updateQuery = `UPDATE event SET approval_status = ?, approval_date = ? WHERE event_id = ?`;
+        const result = await pool.execute(updateQuery, [2, approval_date, event_id]);
+
+        // Check if any rows were affected by the update
+        if (result[0].affectedRows === 0) {
+            console.log('Event not found');
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response
+        res.json({ success: true, message: 'Event Declined' });
+    } catch (error) {
+        console.error('Error updating event approval status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
 
 
 
@@ -1004,7 +1029,13 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
         console.log('API displayevent requested');
 
         // Select event with approval_status = 1
-        const selectQuery = 'SELECT * FROM event WHERE approval_status = ?';
+        const selectQuery = `
+        SELECT event.*, sports.sport_name 
+        FROM event 
+        JOIN sports ON event.sport_id = sports.sport_id 
+        WHERE event.approval_status = ? 
+        ORDER BY event.approval_date DESC
+    `;
         const [event] = await pool.execute(selectQuery, [1]);
 
         // Send response with the retrieved event
@@ -1016,7 +1047,60 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
 }]);
 
 
+// API endpoint for displaying approved events by sport_name
+app.post('/api/displayeventsport', authenticateToken, async(req, res) => {
+    try {
+        const { sport_name } = req.body;
+        console.log('API displayevent requested');
 
+
+
+        // Select events with approval_status = 1 for the given sport_name
+        const selectQuery = `
+            SELECT event.*, sports.sport_name 
+            FROM event 
+            JOIN sports ON event.sport_id = sports.sport_id 
+            WHERE event.approval_status = 1 AND sports.sport_name = ? 
+            ORDER BY event.approval_date DESC
+        `;
+
+        const [event] = await pool.execute(selectQuery, [sport_name]);
+
+        // Send response with the retrieved events
+        res.json({ success: true, event });
+    } catch (error) {
+        console.error('Error displaying events:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API endpoint for displaying specific approved event
+app.post('/api/displayeventfilter', [authenticateToken, async(req, res) => {
+    try {
+        const { event_id } = req.body;
+        console.log('API displayevent requested ');
+
+        // Select event with approval_status = 1 and matching event_id
+        const selectQuery = 'SELECT * FROM event WHERE approval_status = ? AND event_id = ?';
+        const [event] = await pool.execute(selectQuery, [1, event_id]);
+
+        if (event.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response with the retrieved event
+        res.json({ success: true, event: event[0] });
+    } catch (error) {
+        console.error('Error displaying event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+
+// API endpoint for display event an specific sport pending
 app.post('/api/createdevent', [authenticateToken, async(req, res) => {
     try {
         const { sport_name } = req.body;
@@ -1037,6 +1121,7 @@ app.post('/api/createdevent', [authenticateToken, async(req, res) => {
             FROM event e
             JOIN profile p ON e.created_by = p.roll_no
             WHERE e.sport_id = ? AND e.approval_status = 0
+            ORDER BY e.created_date DESC
         `;
 
         const [events] = await pool.execute(eventQuery, [sport_id]);
@@ -1058,7 +1143,7 @@ app.post('/api/createdevent', [authenticateToken, async(req, res) => {
 }]);
 
 
-
+// API endpoint for display event an specific sport
 app.post('/api/createdeventhist', [authenticateToken, async(req, res) => {
     try {
         const { sport_name } = req.body;
@@ -1079,6 +1164,7 @@ app.post('/api/createdeventhist', [authenticateToken, async(req, res) => {
             FROM event e
             JOIN profile p ON e.created_by = p.roll_no
             WHERE e.sport_id = ? AND e.approval_status != 0
+            ORDER BY e.approval_date DESC
         `;
 
         const [events] = await pool.execute(eventQuery, [sport_id]);
@@ -1099,7 +1185,7 @@ app.post('/api/createdeventhist', [authenticateToken, async(req, res) => {
     }
 }]);
 
-
+// API endpoint for shhowing pending event
 app.get('/api/showingevents', authenticateToken, async(req, res) => {
     try {
         console.log('API showingevents requested');
@@ -1111,6 +1197,7 @@ app.get('/api/showingevents', authenticateToken, async(req, res) => {
             JOIN profile p ON e.created_by = p.roll_no
             JOIN sports s ON e.sport_id = s.sport_id
             WHERE e.approval_status = 0
+               ORDER BY e.created_date DESC
         `;
 
         const [events] = await pool.execute(eventQuery);
@@ -1130,6 +1217,37 @@ app.get('/api/showingevents', authenticateToken, async(req, res) => {
     }
 });
 
+// API endpoint for showing all events to admin
+app.get('/api/showingeventhist', authenticateToken, async(req, res) => {
+    try {
+        console.log('API showingevents requested');
+
+        // Step 1: Retrieve events with approval_status = 0 and join with profile table
+        const eventQuery = `
+            SELECT e.*, p.roll_no, p.name AS profile_name, p.email, p.photo_path, s.sport_name
+            FROM event e
+            JOIN profile p ON e.created_by = p.roll_no
+            JOIN sports s ON e.sport_id = s.sport_id
+            WHERE e.approval_status != 0
+              ORDER BY e.approval_date DESC
+        `;
+
+        const [events] = await pool.execute(eventQuery);
+
+        // Step 2: Construct response object
+        const responseData = {
+            success: true,
+            events: events,
+        };
+
+        // Step 3: Send response with all data in a single JSON object
+        res.json(responseData);
+
+    } catch (error) {
+        console.error('Error retrieving showing events:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 // API endpoint for updating an event
 app.post('/api/updateevent', [authenticateToken, async(req, res) => {
