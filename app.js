@@ -897,27 +897,41 @@ app.post('/api/nextyear', [authenticateToken, async(req, res) => {
 
 // API endpoint for adding an event
 app.post('/api/addevent', [authenticateToken, async(req, res) => {
-    let { event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date } = req.body;
+    let { event_name, sport_name, date, time, entry_fee, is_team, event_description, no_of_prizes, category, gender, form_link, last_date, location, roll_no, created_date } = req.body;
 
-    // Convert event_name, event_description, place, and roll_no (created_by) to lowercase
+    // Convert event_name, event_description, location, and roll_no (created_by) to lowercase
     event_name = event_name.toLowerCase();
     event_description = event_description.toLowerCase();
-    place = place.toLowerCase();
+    location = location.toLowerCase(); // Correct variable name to lowercase
     roll_no = roll_no.toLowerCase();
 
     try {
-        console.log('API addevent requested');
+
+
+        // Query to get sport_id from sports table based on sport_name
+        const getSportIdQuery = `SELECT sport_id FROM sports WHERE sport_name = ?`;
+        const [rows, fields] = await pool.execute(getSportIdQuery, [sport_name]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Sport not found' });
+        }
+
+        const sport_id = rows[0].sport_id;
 
         // Insert new event into the event table with provided created_date
-        const insertQuery = `INSERT INTO event (event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const result = await pool.execute(insertQuery, [event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, roll_no, created_date, 0]);
+        const insertQuery = `INSERT INTO event (event_name, sport_id, event_date, event_time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place, created_by, created_date, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const result = await pool.execute(insertQuery, [event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prizes, category, gender, form_link, last_date, location, roll_no, created_date, 0]);
 
         // Send response
         res.json({ success: true, message: 'Event added successfully' });
     } catch (error) {
         console.error('Error adding event:', error);
+        if (error.sqlMessage) {
+            console.error('SQL Error:', error.sqlMessage);
+        }
         res.status(500).json({ error: 'Internal Server Error' });
     }
+
 }]);
 
 
