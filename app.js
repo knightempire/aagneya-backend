@@ -1076,15 +1076,20 @@ app.post('/api/displayeventsport', authenticateToken, async(req, res) => {
 
 
 
-// API endpoint for displaying specific approved event
-app.post('/api/displayeventfilter', [authenticateToken, async(req, res) => {
+app.post('/api/displayeventfilter', authenticateToken, async(req, res) => {
     try {
         const { event_id } = req.body;
-        console.log('API displayevent requested ');
+        console.log('API displayevent requested');
 
-        // Select event with approval_status = 1 and matching event_id
-        const selectQuery = 'SELECT * FROM event WHERE approval_status = ? AND event_id = ?';
-        const [event] = await pool.execute(selectQuery, [1, event_id]);
+        // Select event with approval_status = 1 and matching event_id, joining with sports table
+        const selectQuery = `
+            SELECT event.*, sports.sport_name
+            FROM event 
+            JOIN sports ON event.sport_id = sports.sport_id
+            WHERE event.approval_status = 1 AND event.event_id = ?
+        `;
+
+        const [event] = await pool.execute(selectQuery, [event_id]);
 
         if (event.length === 0) {
             return res.status(404).json({ error: 'Event not found' });
@@ -1096,9 +1101,64 @@ app.post('/api/displayeventfilter', [authenticateToken, async(req, res) => {
         console.error('Error displaying event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
+
+app.post('/api/displayeventfilternnotapproved', authenticateToken, async(req, res) => {
+    try {
+        const { event_id } = req.body;
+        console.log('API displayevent not approved requested');
+
+        // Select event with approval_status = 1 and matching event_id, joining with sports table
+        const selectQuery = `
+            SELECT event.*, sports.sport_name
+            FROM event 
+            JOIN sports ON event.sport_id = sports.sport_id
+            WHERE event.approval_status = 0 AND event.event_id = ?
+        `;
+
+        const [event] = await pool.execute(selectQuery, [event_id]);
+
+        if (event.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response with the retrieved event
+        res.json({ success: true, event: event[0] });
+    } catch (error) {
+        console.error('Error displaying event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+app.post('/api/displayeventfilterall', authenticateToken, async(req, res) => {
+    try {
+        const { event_id } = req.body;
+        console.log('API displayevent not approved requested');
+
+        // Select event with approval_status = 1 and matching event_id, joining with sports table
+        const selectQuery = `
+            SELECT event.*, sports.sport_name
+            FROM event 
+            JOIN sports ON event.sport_id = sports.sport_id
+            WHERE event.approval_status != 0 AND event.event_id = ?
+        `;
+
+        const [event] = await pool.execute(selectQuery, [event_id]);
+
+        if (event.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response with the retrieved event
+        res.json({ success: true, event: event[0] });
+    } catch (error) {
+        console.error('Error displaying event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 // API endpoint for display event an specific sport pending
 app.post('/api/createdevent', [authenticateToken, async(req, res) => {
@@ -1249,76 +1309,23 @@ app.get('/api/showingeventhist', authenticateToken, async(req, res) => {
     }
 });
 
-// API endpoint for updating an event
-app.post('/api/updateevent', [authenticateToken, async(req, res) => {
-    const { event_id, event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place } = req.body;
-
-    try {
-        console.log('API updateevent requested');
-
-        const [eventRows] = await pool.execute('SELECT approval_status FROM event WHERE event_id = ?', [event_id]);
-
-        if (eventRows.length === 0) {
-            return res.status(404).json({ error: 'Event not found' });
-        }
-
-        const approvalStatus = eventRows[0].approval_status;
-        if (approvalStatus === 1) {
-            return res.status(403).json({ error: 'Event is already published and cannot be edited' });
-        }
-
-        // Update the event in the database
-        const updateQuery = `
-            UPDATE event 
-            SET 
-                event_name = ?, 
-                sport_id = ?, 
-                date = ?, 
-                time = ?, 
-                entry_fee = ?, 
-                is_team = ?, 
-                event_description = ?, 
-                no_of_prize = ?, 
-                category = ?, 
-                gender = ?, 
-                form_link = ?, 
-                last_date = ?, 
-                place = ? 
-            WHERE 
-                event_id = ?`;
-
-        await pool.execute(updateQuery, [
-            event_name,
-            sport_id,
-            date,
-            time,
-            entry_fee,
-            is_team,
-            event_description,
-            no_of_prize,
-            category,
-            gender,
-            form_link,
-            last_date,
-            place,
-            event_id
-        ]);
-
-        // Send success response
-        res.json({ success: true, message: 'Event updated successfully' });
-    } catch (error) {
-        console.error('Error updating event:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}]);
-
-
 // API endpoint for updating an event by admin
-app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
-    const { event_id, event_name, sport_id, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, last_date, place } = req.body;
+app.post('/api/updateevent', authenticateToken, async(req, res) => {
+    const { event_id, event_name, sport_name, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, place } = req.body;
 
     try {
         console.log('API adminupdateevent requested');
+        console.log('Request Body:', req.body);
+
+        // Retrieve sport_id from sports table based on sport_name
+        const selectSportQuery = 'SELECT sport_id FROM sports WHERE sport_name = ?';
+        const [sportResult] = await pool.execute(selectSportQuery, [sport_name]);
+
+        if (sportResult.length === 0) {
+            return res.status(404).json({ error: 'Sport not found' });
+        }
+
+        const sport_id = sportResult[0].sport_id;
 
         // Update the event in the database
         const updateQuery = `
@@ -1326,8 +1333,8 @@ app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
             SET 
                 event_name = ?, 
                 sport_id = ?, 
-                date = ?, 
-                time = ?, 
+                event_date = ?, 
+                event_time = ?, 
                 entry_fee = ?, 
                 is_team = ?, 
                 event_description = ?, 
@@ -1335,7 +1342,6 @@ app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
                 category = ?, 
                 gender = ?, 
                 form_link = ?, 
-                last_date = ?, 
                 place = ? 
             WHERE 
                 event_id = ?`;
@@ -1352,7 +1358,6 @@ app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
             category,
             gender,
             form_link,
-            last_date,
             place,
             event_id
         ]);
@@ -1363,7 +1368,58 @@ app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
         console.error('Error updating event by admin:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
+
+
+// API endpoint for updating an event by admin
+// app.post('/api/adminupdateevent', [authenticateToken, async(req, res) => {
+//     const { event_id, event_name, sport_name, date, time, entry_fee, is_team, event_description, no_of_prize, category, gender, form_link, place } = req.body;
+
+//     try {
+//         console.log('API adminupdateevent requested');
+//         console.log('Request Body:', req.body);
+//         // Update the event in the database
+//         const updateQuery = `
+//             UPDATE event 
+//             SET 
+//                 event_name = ?, 
+//                 sport_id = ?, 
+//                 date = ?, 
+//                 time = ?, 
+//                 entry_fee = ?, 
+//                 is_team = ?, 
+//                 event_description = ?, 
+//                 no_of_prize = ?, 
+//                 category = ?, 
+//                 gender = ?, 
+//                 form_link = ?, 
+//                 place = ? 
+//             WHERE 
+//                 event_id = ?`;
+
+//         await pool.execute(updateQuery, [
+//             event_name,
+//             sport_id,
+//             date,
+//             time,
+//             entry_fee,
+//             is_team,
+//             event_description,
+//             no_of_prize,
+//             category,
+//             gender,
+//             form_link,
+//             place,
+//             event_id
+//         ]);
+
+//         // Send success response
+//         res.json({ success: true, message: 'Event updated successfully' });
+//     } catch (error) {
+//         console.error('Error updating event by admin:', error);
+//         res.status(500).json({ error: 'Internal Server Error' });
+//     }
+// }]);
 
 
 
