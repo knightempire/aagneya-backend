@@ -1104,6 +1104,32 @@ app.post('/api/displayeventfilter', authenticateToken, async(req, res) => {
 });
 
 
+app.post('/api/displayeventfilternone', authenticateToken, async(req, res) => {
+    try {
+        const { event_id } = req.body;
+        console.log('API displayevent requested');
+
+        // Select event with approval_status = 1 and matching event_id, joining with sports table
+        const selectQuery = `
+            SELECT event.*, sports.sport_name
+            FROM event 
+            JOIN sports ON event.sport_id = sports.sport_id
+            WHERE event.approval_status = 0 AND event.event_id = ?
+        `;
+
+        const [event] = await pool.execute(selectQuery, [event_id]);
+
+        if (event.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        // Send response with the retrieved event
+        res.json({ success: true, event: event[0] });
+    } catch (error) {
+        console.error('Error displaying event:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 app.post('/api/displayeventfilternnotapproved', authenticateToken, async(req, res) => {
     try {
