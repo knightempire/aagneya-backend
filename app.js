@@ -1034,7 +1034,7 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
         FROM event 
         JOIN sports ON event.sport_id = sports.sport_id 
         WHERE event.approval_status = ? 
-        ORDER BY event.approval_date DESC
+        ORDER BY event.event_date DESC
     `;
         const [event] = await pool.execute(selectQuery, [1]);
 
