@@ -309,7 +309,7 @@ app.post('/api/login', async(req, res) => {
 
 // Route for user registration
 app.post('/api/register', [authenticateToken, async(req, res) => {
-    const { roll_no, date, role_id, sport_id, year } = req.body;
+    const { roll_no, date, role_id, sport_id, year, gender } = req.body;
     try {
         console.log('API registration requested');
         // Check if the roll number already exists (case-insensitive check)
@@ -326,7 +326,7 @@ app.post('/api/register', [authenticateToken, async(req, res) => {
         // Insert new user into the login table
         const loginResult = await pool.execute('INSERT INTO login (roll_no, password, is_active, date, role_id) VALUES (?, ?, ?, ?, ?)', [roll_no, hashedPassword, 1, date, role_id]);
         // Insert sport_id and year into the profile table
-        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id, year) VALUES (?, ?, ?)', [roll_no, sport_id, year]);
+        const profileResult = await pool.execute('INSERT INTO profile (roll_no, sport_id, year,gender) VALUES (?, ?, ?, ?)', [roll_no, sport_id, year, gender]);
         // Send response
         res.json({ success: true, message: 'User registered successfully' });
     } catch (error) {
@@ -421,32 +421,54 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
 }]);
 
 
-// API endpoint for adding a profile
-app.post('/api/addprofile', [authenticateToken, upload.single('photo'), async(req, res) => {
-    let { roll_no, name, email, sport_id, phone } = req.body;
+app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
+    let { roll_no, name, email, phone, date, sport_name } = req.body;
 
-    // Convert roll_no and phone to lowercase
+    // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
-
-
+    console.log(req.body)
+    console.log(roll_no)
+    console.log(sport_name)
     try {
-        console.log('API add profile requested');
-
+        // Check if photo was uploaded
+        console.log("api addprofile requested")
         if (!req.file) {
             throw new Error('No photo uploaded.');
         }
 
-        // Inserting data into the profile table
-        const insertQuery = `INSERT INTO profile (roll_no, name, photo_path, email, sport_id, phone) VALUES (?, ?, ?, ?, ?, ?)`;
-        connection.query(insertQuery, [roll_no, name, req.file.path, email, sport_id, phone], (error, results, fields) => {
-            if (error) {
-                console.error("Error inserting data: ", error);
-                res.status(500).json({ error: "Error inserting data into the database" });
-            } else {
-                console.log("Data inserted successfully");
-                res.status(200).json({ success: true, message: "Profile added successfully" });
-            }
-        });
+        let path = req.file.path;
+        console.log("Uploaded file path:", path);
+
+
+
+        const updateQuery = `
+        UPDATE profile
+        SET name = ?,
+            photo_path = ?,
+            email = ?,
+            phone = ?
+        WHERE roll_no = ?
+    `;
+
+        const [result, fields2] = await pool.execute(updateQuery, [name, path, email, phone, roll_no]);
+        const qaCheckQuery = `
+        SELECT * FROM qa
+        WHERE roll_no = ?
+    `;
+        const [qaRows, qaFields] = await pool.execute(qaCheckQuery, [roll_no]);
+
+        if (qaRows.length === 0) {
+            // Insert into qa table if roll_no does not exist
+            const insertQAQuery = `
+            INSERT INTO qa (roll_no, dob)
+            VALUES (?, ?)
+        `;
+            await pool.execute(insertQAQuery, [roll_no, date]);
+            console.log("Data inserted into QA table");
+        }
+
+        console.log("Data inserted successfully");
+        res.status(200).json({ success: true, message: "Profile added successfully" });
     } catch (error) {
         console.error("Error adding profile: ", error);
         res.status(500).json({ error: "Error adding profile." });
@@ -758,7 +780,7 @@ app.get('/api/displaymem', authenticateToken, async(req, res) => {
 app.post('/api/displaymem', authenticateToken, async(req, res) => {
     try {
         const { roll_no } = req.body; // Assuming role_no is passed in the request body
-
+        console.log('API displaymember requested');
         // Query to join profile, login, roles, and sports tables filtered by roll_no
         const [rows, fields] = await pool.query(`
             SELECT 
