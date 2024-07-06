@@ -474,7 +474,7 @@ app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(re
 }]);
 
 // API endpoint for verifying roll number and date of birth
-app.post('/api/verifyroleno',  async(req, res) => {
+app.post('/api/verifyroleno', async(req, res) => {
     let { roll_no, dob } = req.body;
 
     roll_no = roll_no.toLowerCase(); // Convert roll_no to lowercase
@@ -1054,7 +1054,7 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
         FROM event 
         JOIN sports ON event.sport_id = sports.sport_id 
         WHERE event.approval_status = ? 
-        ORDER BY event.approval_date DESC
+        ORDER BY event.event_date DESC
     `;
         const [event] = await pool.execute(selectQuery, [1]);
 
