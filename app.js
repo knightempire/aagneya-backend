@@ -439,8 +439,6 @@ app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(re
         let path = req.file.path;
         console.log("Uploaded file path:", path);
 
-
-
         const updateQuery = `
         UPDATE profile
         SET name = ?,
@@ -1056,7 +1054,7 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
         FROM event 
         JOIN sports ON event.sport_id = sports.sport_id 
         WHERE event.approval_status = ? 
-        ORDER BY event.event_date DESC
+        ORDER BY event.approval_date DESC
     `;
         const [event] = await pool.execute(selectQuery, [1]);
 
