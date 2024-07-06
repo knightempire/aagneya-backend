@@ -482,8 +482,8 @@ app.post('/api/verifyroleno', async(req, res) => {
     try {
         console.log('API verifyroleno requested');
 
-        // Check if the user exists in the login table with the provided roll number and DOB
-        const [user] = await pool.execute('SELECT * FROM login WHERE LOWER(roll_no) = ? AND dob = ?', [roll_no, dob]);
+        // Check if the user exists in the qa table with the provided roll number and DOB
+        const [user] = await pool.execute('SELECT * FROM qa WHERE LOWER(roll_no) = ? AND dob = ?', [roll_no, dob]);
 
         if (user.length > 0) {
             // If user exists and credentials are correct, return success
