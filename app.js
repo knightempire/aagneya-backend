@@ -474,7 +474,7 @@ app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(re
 }]);
 
 // API endpoint for verifying roll number and date of birth
-app.post('/api/verifyroleno', [authenticateToken, async(req, res) => {
+app.post('/api/verifyroleno',  async(req, res) => {
     let { roll_no, dob } = req.body;
 
     roll_no = roll_no.toLowerCase(); // Convert roll_no to lowercase
@@ -498,11 +498,11 @@ app.post('/api/verifyroleno', [authenticateToken, async(req, res) => {
         console.error('Error verifying credentials:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
 // API endpoint for verifying security question answer
-app.post('/api/verifysecurity', [authenticateToken, async(req, res) => {
+app.post('/api/verifysecurity', async(req, res) => {
     const { roll_no, qa_id, qa_answer } = req.body;
 
     // Convert roll_no to lowercase
@@ -551,11 +551,11 @@ app.post('/api/verifysecurity', [authenticateToken, async(req, res) => {
         console.error('Error verifying security question answer:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
 // API endpoint for resetting password
-app.post('/api/resetpassword', [authenticateToken, async(req, res) => {
+app.post('/api/resetpassword', async(req, res) => {
     let { roll_no, new_password } = req.body;
 
     // Convert roll_no to lowercase
@@ -584,7 +584,7 @@ app.post('/api/resetpassword', [authenticateToken, async(req, res) => {
         console.error('Error resetting password:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
 // API endpoint for hard resetting password
