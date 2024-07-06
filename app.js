@@ -391,26 +391,29 @@ app.get('/api/displaysports', [authenticateToken, async(req, res) => {
 
 // Route for adding security information
 app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
-    let { roll_no, dob, hospital_born, school, fav_friend } = req.body;
-
-    // Convert roll_no, hospital_born, school, and fav_friend to lowercase
-    roll_no = roll_no.toLowerCase();
-    hospital_born = hospital_born.toLowerCase();
-    school = school.toLowerCase();
-    fav_friend = fav_friend.toLowerCase();
-
     try {
         console.log('API addsecurity requested');
 
-        // Check if the roll_no already exists in the database
-        const [existingEntry] = await pool.execute('SELECT * FROM qa WHERE LOWER(roll_no) = ?', [roll_no]);
+        // Destructure roll_no and formData from req.body
+        const { roll_no, formData } = req.body;
 
-        if (existingEntry.length > 0) {
-            return res.status(400).json({ error: 'Security information for this roll number already exists' });
-        }
+        // Destructure hospital_born, school, fav_friend from formData
+        const { hospital_born, school, fav_friend } = formData;
+
+        // Convert roll_no, hospital_born, school, and fav_friend to lowercase
+        const loweredRollNo = roll_no.toLowerCase();
+        const loweredHospitalBorn = hospital_born.toLowerCase();
+        const loweredSchool = school.toLowerCase();
+        const loweredFavFriend = fav_friend.toLowerCase();
+
 
         // Insert new security information into the qa table
-        const result = await pool.execute('INSERT INTO qa (roll_no, dob, hospital_born, school, fav_friend) VALUES (?, ?, ?, ?, ?)', [roll_no, dob, hospital_born, school, fav_friend]);
+        const result = await pool.execute(
+            'UPDATE qa SET hospital_born = ?, school = ?, fav_friend = ? WHERE roll_no = ?', [loweredHospitalBorn, loweredSchool, loweredFavFriend, loweredRollNo]
+        );
+
+
+        console.log('Security information added successfully');
 
         // Send response
         res.json({ success: true, message: 'Security information added successfully' });
@@ -419,6 +422,7 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
 
 
 app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
