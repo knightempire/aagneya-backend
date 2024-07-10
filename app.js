@@ -1704,7 +1704,7 @@ app.post('/api/addachievement', [authenticateToken, upload.single('image'), uplo
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         await pool.execute(insertQuery, [
-            achievement_id, description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, 0
+            achievement_id, description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, 0, 0
         ]);
 
         res.json({ success: true, message: 'Achievement added successfully' });
