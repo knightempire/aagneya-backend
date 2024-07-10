@@ -55,6 +55,7 @@ const pool = mysql.createPool(dbConfig);
 
 // Serve uploaded images statically
 app.use('/uploads', express.static('./uploads'));
+app.use('/pdf', express.static('./pdf'));
 
 
 
@@ -78,6 +79,28 @@ const upload = multer({
         cb(null, true);
     }
 });
+
+// Multer middleware setup for PDFs
+const pdfStorage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, 'pdf'); // Directory where uploaded PDF files will be stored
+    },
+    filename: function(req, file, cb) {
+        cb(null, 'doc_' + Date.now() + path.extname(file.originalname)); // Rename the PDF file if needed
+    }
+});
+
+const uploadPdf = multer({
+    storage: pdfStorage,
+    fileFilter: function(req, file, cb) {
+        // Check if the file is a PDF
+        if (!file.mimetype.startsWith('application/pdf')) {
+            return cb(new Error('Only PDF files are allowed.'));
+        }
+        cb(null, true);
+    }
+});
+
 
 // Session middleware configuration
 app.use(session({
@@ -1657,9 +1680,10 @@ app.post('/api/adminupdateblog', [authenticateToken, async(req, res) => {
 
 
 
+
 // Add Achievement
-app.post('/api/addachievement', [authenticateToken, async(req, res) => {
-    let { description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
+app.post('/api/addachievement', [authenticateToken, upload.single('image'), uploadPdf.single('pdf'), async(req, res) => {
+    let { achievement_id, description, achievement_name, name, achievement_date, roll_no, location, is_team } = req.body;
 
     // Convert necessary fields to lowercase
     roll_no = roll_no.toLowerCase();
@@ -1669,9 +1693,19 @@ app.post('/api/addachievement', [authenticateToken, async(req, res) => {
     try {
         console.log('API addachievement requested');
 
+        // Extract uploaded file paths
+        const photo_path = req.file.path; // Image path
+        const certificate_path = req.file.path; // PDF path
+
         // Insert new achievement into the achievement table
-        const insertQuery = `INSERT INTO achievement (description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        await pool.execute(insertQuery, [description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, 0]);
+        const insertQuery = `
+            INSERT INTO achievement 
+            (achievement_id, description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        await pool.execute(insertQuery, [
+            achievement_id, description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, 0
+        ]);
 
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
@@ -1679,6 +1713,7 @@ app.post('/api/addachievement', [authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
 
 // Achievement Approval
 app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
