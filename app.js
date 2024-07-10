@@ -1854,41 +1854,35 @@ app.post('/api/adminupdateachievement', [authenticateToken, async(req, res) => {
 
 
 
-// Route for registering candidates for an election
-app.post('/api/electionregister', [authenticateToken, async(req, res) => {
-    const { election_id, roll_no, role_id } = req.body;
+
+// API route for creating an election and inserting a new election year
+app.post('/api/electioncreate', [authenticateToken, async(req, res) => {
+    const { year } = req.body;
 
     try {
-        console.log('API electionregister requested');
-        // Fetch candidate with the same reg_roll_no for the given election_id
-        const fetchCandidateQuery = 'SELECT candidate_id, role_id FROM candidate WHERE election_id = ? AND reg_roll_no = ?';
-        const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id, roll_no]);
+        console.log('API electioncreate requested');
 
-        // Check if candidate already exists
-        if (candidateRows.length > 0) {
-            const { role_id } = candidateRows[0];
+        // Check if the election year already exists
+        const checkQuery = 'SELECT * FROM election WHERE year = ?';
+        const [existingRows] = await pool.execute(checkQuery, [year]);
 
-            // Fetch role_name based on role_id
-            const fetchRoleQuery = 'SELECT role_name FROM roles WHERE role_id = ?';
-            const [roleRows] = await pool.execute(fetchRoleQuery, [role_id]);
-
-            if (roleRows.length > 0) {
-                const { role_name } = roleRows[0];
-                return res.status(400).json({ error: `You are already registered for this election as ${role_name}` });
-            }
+        if (existingRows.length > 0) {
+            return res.status(400).json({ error: 'Election year already exists' });
         }
 
-        // If candidate does not exist, proceed with insertion
-        const insertQuery = 'INSERT INTO candidate (election_id, reg_roll_no, role_id) VALUES (?, ?, ?)';
-        const result = await pool.execute(insertQuery, [election_id, roll_no, role_id]);
+        // Insert new election year with is_register = 0 and is_vote = 0
+        const insertQuery = 'INSERT INTO election (year, is_register, is_vote) VALUES (?, 0, 0)';
+        const [insertResult] = await pool.execute(insertQuery, [year]);
 
-        res.json({ success: true, message: 'Registration successful' });
+        // Retrieve the auto-generated election_id from the insert result
+        const election_id = insertResult.insertId;
+
+        res.json({ success: true, election_id, message: 'New election year inserted successfully' });
     } catch (error) {
-        console.error('Error registering candidate:', error);
+        console.error('Error creating election year:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
-
 
 
 // Route for opening registration for an election
@@ -1958,6 +1952,41 @@ app.post('/api/electionregisterclose', [authenticateToken, async(req, res) => {
     }
 }]);
 
+
+// Route for registering candidates for an election
+app.post('/api/electionregister', [authenticateToken, async(req, res) => {
+    const { election_id, roll_no, role_id } = req.body;
+
+    try {
+        console.log('API electionregister requested');
+        // Fetch candidate with the same reg_roll_no for the given election_id
+        const fetchCandidateQuery = 'SELECT candidate_id, role_id FROM candidate WHERE election_id = ? AND reg_roll_no = ?';
+        const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id, roll_no]);
+
+        // Check if candidate already exists
+        if (candidateRows.length > 0) {
+            const { role_id } = candidateRows[0];
+
+            // Fetch role_name based on role_id
+            const fetchRoleQuery = 'SELECT role_name FROM roles WHERE role_id = ?';
+            const [roleRows] = await pool.execute(fetchRoleQuery, [role_id]);
+
+            if (roleRows.length > 0) {
+                const { role_name } = roleRows[0];
+                return res.status(400).json({ error: `You are already registered for this election as ${role_name}` });
+            }
+        }
+
+        // If candidate does not exist, proceed with insertion
+        const insertQuery = 'INSERT INTO candidate (election_id, reg_roll_no, role_id) VALUES (?, ?, ?)';
+        const result = await pool.execute(insertQuery, [election_id, roll_no, role_id]);
+
+        res.json({ success: true, message: 'Registration successful' });
+    } catch (error) {
+        console.error('Error registering candidate:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
 
 
 // Route for opening voting for an election
