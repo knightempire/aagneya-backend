@@ -104,14 +104,14 @@ const uploadPdf = multer({
 
 // Multer middleware setup for images and PDFs
 const storage1 = multer.diskStorage({
-    destination: function (req, file, cb) {
+    destination: function(req, file, cb) {
         if (file.mimetype.startsWith('image/')) {
             cb(null, 'uploads');
         } else if (file.mimetype.startsWith('application/pdf')) {
             cb(null, 'pdf');
         }
     },
-    filename: function (req, file, cb) {
+    filename: function(req, file, cb) {
         if (file.mimetype.startsWith('image/')) {
             cb(null, 'img_' + Date.now() + path.extname(file.originalname));
         } else if (file.mimetype.startsWith('application/pdf')) {
@@ -122,7 +122,7 @@ const storage1 = multer.diskStorage({
 
 const upload1 = multer({
     storage: storage1,
-    fileFilter: function (req, file, cb) {
+    fileFilter: function(req, file, cb) {
         if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('application/pdf')) {
             return cb(new Error('Only images and PDFs are allowed.'));
         }
@@ -1713,14 +1713,14 @@ app.post('/api/adminupdateblog', [authenticateToken, async(req, res) => {
 
 
 //add achievement
-app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
     let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
 
     // Convert necessary fields to lowercase
     name = name.toLowerCase();
     description = description.toLowerCase();
 
-    
+
 
     // Handle roll_no parsing gracefully
     let parsedRollNo;
@@ -1731,9 +1731,9 @@ app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'ima
         }
         // Convert each item to lowercase
         parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
-        
+
     } catch (error) {
-        
+
         return res.status(400).json({ error: 'Invalid roll_no format' });
     }
 
@@ -1741,29 +1741,29 @@ app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'ima
     const location = null;
 
     try {
-        
+
 
         // Extract uploaded file paths
         const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
         const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
 
-        
+
         // Insert new achievement into the achievement table
         const insertQuery = `
             INSERT INTO achievement 
             (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-        
+
 
         await pool.execute(insertQuery, [
             description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 0
         ]);
 
-        
+
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-       
+
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
@@ -1796,7 +1796,7 @@ app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
 
 
 // Admin Add Achievement without Token Authentication
-app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
     let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
     console.log('API adminaddachievement requested');
     console.log('Request Body:', req.body);
@@ -1804,7 +1804,7 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
     name = name.toLowerCase();
     description = description.toLowerCase();
 
-    
+
 
     // Handle roll_no parsing gracefully
     let parsedRollNo;
@@ -1815,9 +1815,9 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
         }
         // Convert each item to lowercase
         parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
-        
+
     } catch (error) {
-        
+
         return res.status(400).json({ error: 'Invalid roll_no format' });
     }
 
@@ -1825,13 +1825,13 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
     const location = null;
 
     try {
-        
+
 
         // Extract uploaded file paths
         const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
         const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
 
-        
+
 
         // Insert new achievement into the achievement table
         const insertQuery = `
@@ -1839,16 +1839,16 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
             (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-        
+
 
         await pool.execute(insertQuery, [
             description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1
         ]);
 
-        
+
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-       
+
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -1979,6 +1979,65 @@ app.post('/api/adminupdateachievement', [authenticateToken, async(req, res) => {
     }
 }]);
 
+
+// API route for showing election years
+app.get('/api/electionyear', [authenticateToken, async(req, res) => {
+    try {
+        console.log('API election next year data requested');
+
+        // Fetch all election years from the database
+        const query = 'SELECT * FROM election';
+        const [rows] = await pool.execute(query);
+
+        // Check if there are any results
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No election years found' });
+        }
+
+        // Send the retrieved election years as the response
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Error fetching election year data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+// API route for adding 1 year
+app.post('/api/electionaddyear', [authenticateToken, async(req, res) => {
+    try {
+        console.log('API election year data requested');
+
+        // Extract nextyear from the request body
+        const { nextyear } = req.body;
+
+        // Check if nextyear is provided and is 1
+        if (nextyear === 1) {
+            // Fetch the maximum year from the database
+            const maxYearQuery = 'SELECT MAX(year) AS maxYear FROM election';
+            const [maxYearResult] = await pool.execute(maxYearQuery);
+
+            // Extract the maximum year from the result
+            const maxYear = maxYearResult[0].maxYear;
+
+            // Calculate the new year to be added
+            const newYear = maxYear ? maxYear + 1 : new Date().getFullYear(); // Default to current year if no years exist
+
+            // Insert new election year with is_register = 0 and is_vote = 0
+            const insertQuery = 'INSERT INTO election (year, is_register, is_vote) VALUES (?, 0, 0)';
+            const [insertResult] = await pool.execute(insertQuery, [newYear]);
+
+            // Retrieve the auto-generated election_id from the insert result
+            const election_id = insertResult.insertId;
+
+            // Send a response indicating success
+            res.json({ success: true, election_id, year: newYear, message: 'New election year added' });
+        }
+    } catch (error) {
+        console.error('Error fetching or adding election year data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
 
 
 
