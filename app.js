@@ -31,6 +31,7 @@ const {
     DB_WAIT_FOR_CONNECTIONS,
     DB_CONNECTION_LIMIT,
     DB_QUEUE_LIMIT,
+    DB_PORT,
     SESSION_SECRET,
     JWT_SECRET,
     JWT_EXPIRY,
@@ -38,8 +39,7 @@ const {
 
 const dbConfig = {
     host: DB_HOST,
-    port: 19516,
-    // port: 3306,
+    port: DB_PORT,
     user: DB_USER,
     password: DB_PASSWORD,
     database: DB_DATABASE,
@@ -100,6 +100,37 @@ const uploadPdf = multer({
         cb(null, true);
     }
 });
+
+
+// Multer middleware setup for images and PDFs
+const storage1 = multer.diskStorage({
+    destination: function (req, file, cb) {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, 'uploads');
+        } else if (file.mimetype.startsWith('application/pdf')) {
+            cb(null, 'pdf');
+        }
+    },
+    filename: function (req, file, cb) {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, 'img_' + Date.now() + path.extname(file.originalname));
+        } else if (file.mimetype.startsWith('application/pdf')) {
+            cb(null, 'doc_' + Date.now() + path.extname(file.originalname));
+        }
+    }
+});
+
+const upload1 = multer({
+    storage: storage1,
+    fileFilter: function (req, file, cb) {
+        if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('application/pdf')) {
+            return cb(new Error('Only images and PDFs are allowed.'));
+        }
+        cb(null, true);
+    }
+});
+
+
 
 
 // Session middleware configuration
@@ -1681,35 +1712,58 @@ app.post('/api/adminupdateblog', [authenticateToken, async(req, res) => {
 
 
 
-// Add Achievement
-app.post('/api/addachievement', [authenticateToken, upload.single('image'), uploadPdf.single('pdf'), async(req, res) => {
-    let { achievement_id, description, achievement_name, name, achievement_date, roll_no, location, is_team } = req.body;
+//add achievement
+app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+    let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
 
     // Convert necessary fields to lowercase
-    roll_no = roll_no.toLowerCase();
     name = name.toLowerCase();
     description = description.toLowerCase();
 
+    
+
+    // Handle roll_no parsing gracefully
+    let parsedRollNo;
     try {
-        console.log('API addachievement requested');
+        parsedRollNo = JSON.parse(roll_no); // Attempt to parse roll_no
+        if (!Array.isArray(parsedRollNo)) {
+            throw new Error('roll_no is not an array');
+        }
+        // Convert each item to lowercase
+        parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
+        
+    } catch (error) {
+        
+        return res.status(400).json({ error: 'Invalid roll_no format' });
+    }
+
+    // Set location to null
+    const location = null;
+
+    try {
+        
 
         // Extract uploaded file paths
-        const photo_path = req.file.path; // Image path
-        const certificate_path = req.file.path; // PDF path
+        const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
+        const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
 
+        
         // Insert new achievement into the achievement table
         const insertQuery = `
             INSERT INTO achievement 
-            (achievement_id, description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        
 
         await pool.execute(insertQuery, [
-            achievement_id, description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, 0, 0
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 0
         ]);
 
+        
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-        console.error('Error adding achievement:', error);
+       
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
@@ -1738,28 +1792,66 @@ app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
     }
 }]);
 
-// Admin Add Achievement
-app.post('/api/adminaddachievement', [authenticateToken, async(req, res) => {
-    let { description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
 
+
+
+// Admin Add Achievement without Token Authentication
+app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+    let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
+    console.log('API adminaddachievement requested');
+    console.log('Request Body:', req.body);
     // Convert necessary fields to lowercase
-    roll_no = roll_no.toLowerCase();
     name = name.toLowerCase();
     description = description.toLowerCase();
 
+    
+
+    // Handle roll_no parsing gracefully
+    let parsedRollNo;
     try {
-        console.log('API adminaddachievement requested');
+        parsedRollNo = JSON.parse(roll_no); // Attempt to parse roll_no
+        if (!Array.isArray(parsedRollNo)) {
+            throw new Error('roll_no is not an array');
+        }
+        // Convert each item to lowercase
+        parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
+        
+    } catch (error) {
+        
+        return res.status(400).json({ error: 'Invalid roll_no format' });
+    }
 
-        // Insert new achievement into the achievement table with is_display = 1
-        const insertQuery = `INSERT INTO achievement (description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, is_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        await pool.execute(insertQuery, [description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus, 1]);
+    // Set location to null
+    const location = null;
 
+    try {
+        
+
+        // Extract uploaded file paths
+        const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
+        const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
+
+        
+
+        // Insert new achievement into the achievement table
+        const insertQuery = `
+            INSERT INTO achievement 
+            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+        
+
+        await pool.execute(insertQuery, [
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1
+        ]);
+
+        
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-        console.error('Error adding achievement:', error);
+       
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 // Display Approved Achievements
 app.get('/api/displayachievements', [authenticateToken, async(req, res) => {
