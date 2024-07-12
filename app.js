@@ -2040,7 +2040,6 @@ app.post('/api/electionaddyear', [authenticateToken, async(req, res) => {
 }]);
 
 
-
 // API route for creating an election and inserting a new election year
 app.post('/api/electioncreate', [authenticateToken, async(req, res) => {
     const { year } = req.body;
@@ -2069,6 +2068,33 @@ app.post('/api/electioncreate', [authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
+
+app.post('/api/electionstatus', [authenticateToken, async(req, res) => {
+    const { year } = req.body; // Get year from request body
+
+    if (!year) {
+        return res.status(400).json({ error: 'Year is required' });
+    }
+
+    try {
+
+
+        const query = 'SELECT * FROM election WHERE year = ?';
+        const [rows] = await pool.execute(query, [year]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Election year not found' });
+        }
+
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        console.error('Error fetching election status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
 
 
 // Route for opening registration for an election
