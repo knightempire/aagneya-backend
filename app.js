@@ -2097,72 +2097,46 @@ app.post('/api/electionstatus', [authenticateToken, async(req, res) => {
 
 
 
-// Route for opening registration for an election
-app.post('/api/electionregisteropen', [authenticateToken, async(req, res) => {
-    const { election_id } = req.body;
+app.post('/api/electionregisterstatus', [authenticateToken, async(req, res) => {
+    const { year, status } = req.body;
 
     try {
-        console.log('API electionregisteropen requested');
-        // Check if the election is already open for registration
-        const checkQuery = 'SELECT is_register FROM election WHERE election_id = ?';
-        const [rows] = await pool.execute(checkQuery, [election_id]);
+        console.log('API electionregister requested');
+
+        // Check if the election exists and get the current registration and voting status
+        const checkQuery = 'SELECT is_register, is_vote FROM election WHERE year = ?';
+        const [rows] = await pool.execute(checkQuery, [year]);
 
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Election not found' });
         }
 
-        const { is_register } = rows[0];
+        const { is_register: currentRegisterStatus, is_vote: currentVoteStatus } = rows[0];
 
-        // If already open for registration, return error
-        if (is_register === 1) {
-            return res.status(400).json({ error: 'Registration is already open for this election' });
+        // Check if the status value is either 0 or 1
+        if (status !== 0 && status !== 1) {
+            return res.status(400).json({ error: 'Invalid status value. It should be 0 or 1.' });
         }
 
-        // Update election to set is_register = 1
-        const updateQuery = 'UPDATE election SET is_register = 1 WHERE election_id = ?';
-        await pool.execute(updateQuery, [election_id]);
+        // Check if trying to open registration when voting is already open
+        if (status === 1 && currentVoteStatus === 1) {
+            return res.status(400).json({ error: 'Cannot open registration because voting is already open.' });
+        }
 
-        res.json({ success: true, message: 'Registration opened successfully' });
+        // Update election registration status based on the provided status value
+        const updateQuery = 'UPDATE election SET is_register = ? WHERE year = ?';
+        await pool.execute(updateQuery, [status, year]);
+
+        // Return appropriate success message
+        const message = status === 1 ? 'Registration opened successfully' : 'Registration closed successfully';
+        res.json({ success: true, message });
+
     } catch (error) {
-        console.error('Error opening registration for election:', error);
+        console.error('Error updating registration for election:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
 
-
-
-// Route for closing registration for an election
-app.post('/api/electionregisterclose', [authenticateToken, async(req, res) => {
-    const { election_id } = req.body;
-
-    try {
-        console.log('API electionregisterclose requested');
-        // Fetch current is_register status for the election
-        const fetchQuery = 'SELECT is_register FROM election WHERE election_id = ?';
-        const [rows] = await pool.execute(fetchQuery, [election_id]);
-
-        // Check if election exists
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Election not found' });
-        }
-
-        const { is_register } = rows[0];
-
-        // If registration is already closed, return error
-        if (is_register === 0) {
-            return res.status(400).json({ error: 'Registration for this election is already closed' });
-        }
-
-        // Update election to set is_register = 0
-        const updateQuery = 'UPDATE election SET is_register = 0 WHERE election_id = ?';
-        const [result] = await pool.execute(updateQuery, [election_id]);
-
-        res.json({ success: true, message: 'Registration closed successfully' });
-    } catch (error) {
-        console.error('Error closing registration for election:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}]);
 
 
 // Route for registering candidates for an election
@@ -2201,73 +2175,52 @@ app.post('/api/electionregister', [authenticateToken, async(req, res) => {
 }]);
 
 
-// Route for opening voting for an election
-app.post('/api/electionvoteopen', [authenticateToken, async(req, res) => {
-    const { election_id } = req.body;
+// Route for opening or closing voting for an election
+app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
+    const { year, status } = req.body;
 
     try {
-        console.log('API electionvoteopen requested');
-        // Fetch current is_vote status for the election
-        const fetchQuery = 'SELECT is_vote FROM election WHERE election_id = ?';
-        const [rows] = await pool.execute(fetchQuery, [election_id]);
+        console.log('API electionvotestatus requested');
 
-        // Check if election exists
+        // Check if the election exists and get the current registration and voting status
+        const checkQuery = 'SELECT is_register, is_vote FROM election WHERE year = ?';
+        const [rows] = await pool.execute(checkQuery, [year]);
+
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Election not found' });
         }
 
-        const { is_vote } = rows[0];
+        const { is_register: currentRegisterStatus, is_vote: currentVoteStatus } = rows[0];
 
-        // If voting is already open, return error
-        if (is_vote === 1) {
-            return res.status(400).json({ error: 'Voting for this election is already open' });
+        // Check if the status value is either 0 or 1
+        if (status !== 0 && status !== 1) {
+            return res.status(400).json({ error: 'Invalid status value. It should be 0 or 1.' });
         }
 
-        // Update election to set is_vote = 1
-        const updateQuery = 'UPDATE election SET is_vote = 1 WHERE election_id = ?';
-        const [result] = await pool.execute(updateQuery, [election_id]);
+        // Check if trying to open voting when registration is open
+        if (status === 1 && currentRegisterStatus === 1) {
+            return res.status(400).json({ error: 'Cannot open voting because registration is already open.' });
+        }
 
-        res.json({ success: true, message: 'Voting opened successfully' });
+        // Check if trying to open voting when it is already open
+        if (status === 1 && currentVoteStatus === 1) {
+            return res.status(400).json({ error: 'Voting is already open.' });
+        }
+
+        // Update election voting status based on the provided status value
+        const updateQuery = 'UPDATE election SET is_vote = ? WHERE year = ?';
+        await pool.execute(updateQuery, [status, year]);
+
+        // Return appropriate success message
+        const message = status === 1 ? 'Voting opened successfully' : 'Voting closed successfully';
+        res.json({ success: true, message });
+
     } catch (error) {
-        console.error('Error opening voting for election:', error);
+        console.error('Error updating voting status for election:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
 
-
-
-// Route for closing voting for an election
-app.post('/api/electionvoteclose', [authenticateToken, async(req, res) => {
-    const { election_id } = req.body;
-
-    try {
-        console.log('API electionvoteclose requested');
-        // Fetch current is_vote status for the election
-        const fetchQuery = 'SELECT is_vote FROM election WHERE election_id = ?';
-        const [rows] = await pool.execute(fetchQuery, [election_id]);
-
-        // Check if election exists
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Election not found' });
-        }
-
-        const { is_vote } = rows[0];
-
-        // If voting is already closed, return error
-        if (is_vote === 0) {
-            return res.status(400).json({ error: 'Voting for this election is already closed' });
-        }
-
-        // Update election to set is_vote = 0
-        const updateQuery = 'UPDATE election SET is_vote = 0 WHERE election_id = ?';
-        const [result] = await pool.execute(updateQuery, [election_id]);
-
-        res.json({ success: true, message: 'Voting closed successfully' });
-    } catch (error) {
-        console.error('Error closing voting for election:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}]);
 
 
 
