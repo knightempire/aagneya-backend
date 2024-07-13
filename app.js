@@ -2101,7 +2101,7 @@ app.post('/api/electionregisterstatus', [authenticateToken, async(req, res) => {
     const { year, status } = req.body;
 
     try {
-        console.log('API electionregister requested');
+        console.log('API electionregister status requested');
 
         // Check if the election exists and get the current registration and voting status
         const checkQuery = 'SELECT is_register, is_vote FROM election WHERE year = ?';
@@ -2113,6 +2113,11 @@ app.post('/api/electionregisterstatus', [authenticateToken, async(req, res) => {
 
         const { is_register: currentRegisterStatus, is_vote: currentVoteStatus } = rows[0];
 
+        // Check if the current registration status is 2 (election results published)
+        if (currentRegisterStatus === 2) {
+            return res.status(400).json({ error: 'The election results have been published. Registration status cannot be changed.' });
+        }
+
         // Check if the status value is either 0 or 1
         if (status !== 0 && status !== 1) {
             return res.status(400).json({ error: 'Invalid status value. It should be 0 or 1.' });
@@ -2121,6 +2126,26 @@ app.post('/api/electionregisterstatus', [authenticateToken, async(req, res) => {
         // Check if trying to open registration when voting is already open
         if (status === 1 && currentVoteStatus === 1) {
             return res.status(400).json({ error: 'Cannot open registration because voting is already open.' });
+        }
+
+        // Check if trying to open registration when another year already has registration open
+        if (status === 1) {
+            const checkOtherRegisterQuery = 'SELECT year FROM election WHERE is_register = 1 AND year <> ?';
+            const [otherRegisterRows] = await pool.execute(checkOtherRegisterQuery, [year]);
+
+            if (otherRegisterRows.length > 0) {
+                const conflictingYear = otherRegisterRows[0].year;
+                return res.status(400).json({ error: `Registration for ${conflictingYear} is already open.` });
+            }
+        }
+
+        // Check if another year has voting open
+        const checkOtherVoteQuery = 'SELECT year FROM election WHERE is_vote = 1 AND year <> ?';
+        const [otherVoteRows] = await pool.execute(checkOtherVoteQuery, [year]);
+
+        if (otherVoteRows.length > 0) {
+            const conflictingVoteYear = otherVoteRows[0].year;
+            return res.status(400).json({ error: `Voting for ${conflictingVoteYear} is already open. Cannot change registration status.` });
         }
 
         // Update election registration status based on the provided status value
@@ -2139,43 +2164,7 @@ app.post('/api/electionregisterstatus', [authenticateToken, async(req, res) => {
 
 
 
-// Route for registering candidates for an election
-app.post('/api/electionregister', [authenticateToken, async(req, res) => {
-    const { election_id, roll_no, role_id } = req.body;
 
-    try {
-        console.log('API electionregister requested');
-        // Fetch candidate with the same reg_roll_no for the given election_id
-        const fetchCandidateQuery = 'SELECT candidate_id, role_id FROM candidate WHERE election_id = ? AND reg_roll_no = ?';
-        const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id, roll_no]);
-
-        // Check if candidate already exists
-        if (candidateRows.length > 0) {
-            const { role_id } = candidateRows[0];
-
-            // Fetch role_name based on role_id
-            const fetchRoleQuery = 'SELECT role_name FROM roles WHERE role_id = ?';
-            const [roleRows] = await pool.execute(fetchRoleQuery, [role_id]);
-
-            if (roleRows.length > 0) {
-                const { role_name } = roleRows[0];
-                return res.status(400).json({ error: `You are already registered for this election as ${role_name}` });
-            }
-        }
-
-        // If candidate does not exist, proceed with insertion
-        const insertQuery = 'INSERT INTO candidate (election_id, reg_roll_no, role_id) VALUES (?, ?, ?)';
-        const result = await pool.execute(insertQuery, [election_id, roll_no, role_id]);
-
-        res.json({ success: true, message: 'Registration successful' });
-    } catch (error) {
-        console.error('Error registering candidate:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}]);
-
-
-// Route for opening or closing voting for an election
 app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
     const { year, status } = req.body;
 
@@ -2192,6 +2181,11 @@ app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
 
         const { is_register: currentRegisterStatus, is_vote: currentVoteStatus } = rows[0];
 
+        // Check if the current voting status is 2 (election results published)
+        if (currentVoteStatus === 2) {
+            return res.status(400).json({ error: 'The election results have been published. Voting status cannot be changed.' });
+        }
+
         // Check if the status value is either 0 or 1
         if (status !== 0 && status !== 1) {
             return res.status(400).json({ error: 'Invalid status value. It should be 0 or 1.' });
@@ -2205,6 +2199,26 @@ app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
         // Check if trying to open voting when it is already open
         if (status === 1 && currentVoteStatus === 1) {
             return res.status(400).json({ error: 'Voting is already open.' });
+        }
+
+        // Check if trying to open voting when it is open for another year
+        if (status === 1) {
+            const checkOtherVoteQuery = 'SELECT year FROM election WHERE is_vote = 1 AND year <> ?';
+            const [otherVoteRows] = await pool.execute(checkOtherVoteQuery, [year]);
+
+            if (otherVoteRows.length > 0) {
+                const conflictingVoteYear = otherVoteRows[0].year;
+                return res.status(400).json({ error: `Voting for ${conflictingVoteYear} is already open.` });
+            }
+        }
+
+        // Check if another year has registration open
+        const checkOtherRegisterQuery = 'SELECT year FROM election WHERE is_register = 1 AND year <> ?';
+        const [otherRegisterRows] = await pool.execute(checkOtherRegisterQuery, [year]);
+
+        if (otherRegisterRows.length > 0) {
+            const conflictingRegisterYear = otherRegisterRows[0].year;
+            return res.status(400).json({ error: `Registration for ${conflictingRegisterYear} is already open. Cannot change voting status.` });
         }
 
         // Update election voting status based on the provided status value
@@ -2223,6 +2237,75 @@ app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
 
 
 
+
+app.post('/api/electionregister', [authenticateToken, async(req, res) => {
+    const { year, roll_no, role_id } = req.body;
+
+    try {
+        console.log('API electionregister requested');
+
+        // Fetch election_id based on year
+        const fetchElectionIdQuery = 'SELECT election_id FROM election WHERE year = ?';
+        const [electionRows] = await pool.execute(fetchElectionIdQuery, [year]);
+
+        // Check if election exists for the given year
+        if (electionRows.length === 0) {
+            return res.status(404).json({ error: 'Election not found for the given year' });
+        }
+
+        const election_id = electionRows[0].election_id;
+
+        // Check if roll_no already registered for this election_id
+        const fetchCandidateQuery = 'SELECT candidate_id FROM candidate WHERE election_id = ? AND reg_roll_no = ?';
+        const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id, roll_no]);
+
+        if (candidateRows.length > 0) {
+            return res.status(400).json({ error: 'You are already registered for this election' });
+        }
+
+        // Fetch profile data based on roll_no
+        const fetchProfileQuery = 'SELECT gender FROM profile WHERE roll_no = ?';
+        const [profileRows] = await pool.execute(fetchProfileQuery, [roll_no]);
+
+        // Check if profile data exists for the given roll_no
+        if (profileRows.length === 0) {
+            return res.status(404).json({ error: 'Profile not found for the given roll number' });
+        }
+
+        const gender = profileRows[0].gender;
+
+        // Insert candidate data into candidate table
+        const insertCandidateQuery = 'INSERT INTO candidate (election_id, reg_roll_no, role_id, gender) VALUES (?, ?, ?, ?)';
+        await pool.execute(insertCandidateQuery, [election_id, roll_no, role_id, gender]);
+
+        // Return success message
+        res.json({ success: true, message: 'Registration successful' });
+
+    } catch (error) {
+        console.error('Error registering candidate:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+
+
+app.get('/api/electionshow', authenticateToken, async(req, res) => {
+    try {
+        console.log('API electionshow requested');
+
+        // Fetch elections where registration is open (is_register = 1)
+        const query = 'SELECT year, is_register, is_vote FROM election WHERE is_register = 1';
+        const [rows] = await pool.execute(query);
+
+        // Return the fetched data
+        res.json(rows);
+
+    } catch (error) {
+        console.error('Error fetching elections with open registration:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 
 // Route for voting
