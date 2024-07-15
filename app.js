@@ -1797,7 +1797,7 @@ app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
 
 // Admin Add Achievement without Token Authentication
 app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
-    let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
+    let { description, achievement_name, name, achievement_date, roll_no, is_team ,sport} = req.body;
     console.log('API adminaddachievement requested');
     console.log('Request Body:', req.body);
     // Convert necessary fields to lowercase
@@ -1836,13 +1836,13 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
         // Insert new achievement into the achievement table
         const insertQuery = `
             INSERT INTO achievement 
-            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display,sport) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`;
 
 
 
         await pool.execute(insertQuery, [
-            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1,sport
         ]);
 
 
@@ -1854,7 +1854,7 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
 });
 
 // Display Approved Achievements
-app.get('/api/displayachievements', [authenticateToken, async(req, res) => {
+app.get('/api/displayachievements', async(req, res) => {
     try {
         console.log('API displayachievements requested');
 
@@ -1866,7 +1866,7 @@ app.get('/api/displayachievements', [authenticateToken, async(req, res) => {
         console.error('Error displaying achievements:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 // Retrieve Created Achievements by Roll Number
 app.post('/api/createdachievements', [authenticateToken, async(req, res) => {
