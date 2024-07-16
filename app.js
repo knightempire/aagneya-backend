@@ -433,6 +433,7 @@ app.get('/api/displaysports', [authenticateToken, async(req, res) => {
 
         // Retrieve data from the sports table
         const [sportsData] = await pool.execute('SELECT * FROM sports ORDER BY sport_name');
+        console.log(sportsData)
 
         // Send response with the retrieved sports data
         res.json({ success: true, sports: sportsData });
@@ -1797,7 +1798,7 @@ app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
 
 // Admin Add Achievement without Token Authentication
 app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
-    let { description, achievement_name, name, achievement_date, roll_no, is_team ,sport} = req.body;
+    let { description, achievement_name, name, achievement_date, roll_no, is_team ,sport_id} = req.body;
     console.log('API adminaddachievement requested');
     console.log('Request Body:', req.body);
     // Convert necessary fields to lowercase
@@ -1836,13 +1837,13 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
         // Insert new achievement into the achievement table
         const insertQuery = `
             INSERT INTO achievement 
-            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display,sport) 
+            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display,sport_id) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`;
 
 
 
         await pool.execute(insertQuery, [
-            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1,sport
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1,sport_id
         ]);
 
 
@@ -1860,6 +1861,25 @@ app.get('/api/displayachievements', async(req, res) => {
 
         const selectQuery = 'SELECT * FROM achievement WHERE is_display = ?';
         const [achievements] = await pool.execute(selectQuery, [1]);
+
+        res.json({ success: true, achievements });
+    } catch (error) {
+        console.error('Error displaying achievements:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+//display pending achievements
+app.get('/api/displayachievementspending', async (req, res) => {
+    try {
+        console.log('API displayachievements requested');
+
+        const selectQuery = `
+            SELECT a.*, s.sport_name 
+            FROM achievement a
+            LEFT JOIN sports s ON a.sport_id = s.sport_id
+            WHERE a.is_display = ?`;
+        const [achievements] = await pool.execute(selectQuery, [0]);
+        console.log(achievements);
 
         res.json({ success: true, achievements });
     } catch (error) {
