@@ -2332,13 +2332,13 @@ app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
         // Query to fetch candidate counts by role and gender
         const candidateCheckQuery = `
             SELECT
-                r.role_id,
-                r.role_name,
+                roles.role_id,
+                roles.role_name,
                 genders.gender,
                 COALESCE(c.candidate_count, 0) AS candidate_count
             FROM
-                (SELECT 1 AS role_id UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS r
-                CROSS JOIN (SELECT 'Boys' AS gender UNION SELECT 'Girls') AS genders
+                (SELECT 'Boys' AS gender UNION SELECT 'Girls') AS genders
+                CROSS JOIN roles
                 LEFT JOIN (
                     SELECT
                         role_id,
@@ -2351,7 +2351,7 @@ app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
                     GROUP BY
                         role_id,
                         gender
-                ) AS c ON r.role_id = c.role_id AND genders.gender = c.gender
+                ) AS c ON roles.role_id = c.role_id AND genders.gender = c.gender
         `;
 
         // Execute the query
@@ -2392,7 +2392,6 @@ app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
-
 
 
 
