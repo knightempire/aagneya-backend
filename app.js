@@ -485,9 +485,7 @@ app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(re
 
     // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
-    console.log(req.body)
-    console.log(roll_no)
-    console.log(sport_name)
+
     try {
         // Check if photo was uploaded
         console.log("api addprofile requested")
@@ -2268,6 +2266,7 @@ app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
 app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
     const { year } = req.body;
 
+
     try {
         console.log('API electionroleppl requested');
 
@@ -2280,45 +2279,49 @@ app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
             return res.status(404).json({ error: 'Election not found for the given year' });
         }
 
-        const { election_id, is_register, is_vote } = electionRows[0];
+        const { election_id, is_reg, is_vote } = electionRows[0];
 
-        // Check if is_reg and is_vote are not 2
-        if (is_register !== 2 && is_vote !== 2) {
-            // Fetch candidate data based on election_id
-            const fetchCandidateQuery = 'SELECT * FROM candidate WHERE election_id = ?';
-            const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id]);
+        // Determine election status based on is_vote and is_reg
+        let electionstatus = 0; // Default to 0
 
-            // Separate candidates into boys and girls arrays based on gender
-            const boys = [];
-            const girls = [];
+        if (is_vote === 1) {
+            electionstatus = 1; // Set electionstatus to 1 if is_vote is 1
+        } else if (is_reg === 2) {
+            electionstatus = 2; // Set electionstatus to 2 if is_reg is 2
+        }
 
-            // Fetch profile data for each candidate
-            for (let candidate of candidateRows) {
-                const fetchProfileQuery = 'SELECT * FROM profile WHERE roll_no = ?';
-                const [profileRows] = await pool.execute(fetchProfileQuery, [candidate.reg_roll_no]);
+        // Fetch candidate data based on election_id
+        const fetchCandidateQuery = 'SELECT * FROM candidate WHERE election_id = ?';
+        const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id]);
 
-                if (profileRows.length > 0) {
-                    const profileData = profileRows[0];
-                    if (candidate.gender === 'Boys') {
-                        boys.push({...candidate, profile: profileData });
-                    } else if (candidate.gender === 'Girls') {
-                        girls.push({...candidate, profile: profileData });
-                    }
+        // Separate candidates into boys and girls arrays based on gender
+        const boys = [];
+        const girls = [];
+
+        // Fetch profile data for each candidate
+        for (let candidate of candidateRows) {
+            const fetchProfileQuery = 'SELECT * FROM profile WHERE roll_no = ?';
+            const [profileRows] = await pool.execute(fetchProfileQuery, [candidate.reg_roll_no]);
+
+            if (profileRows.length > 0) {
+                const profileData = profileRows[0];
+                if (candidate.gender === 'Boys') {
+                    boys.push({...candidate, profile: profileData });
+                } else if (candidate.gender === 'Girls') {
+                    girls.push({...candidate, profile: profileData });
                 }
             }
-
-            // Return arrays with gender-specific candidates including profile data
-            res.json({ success: true, boys, girls });
-        } else {
-            // If is_reg or is_vote is 2, send an appropriate message
-            res.json({ success: true, message: 'No candidate data available for this election due to election status.' });
         }
+
+        // Return arrays with gender-specific candidates including profile data and election status
+        res.json({ success: true, boys, girls, electionstatus });
 
     } catch (error) {
         console.error('Error fetching election role people:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
 
 
 // API route for checking candidate registration status
@@ -2463,6 +2466,47 @@ app.get('/api/electionshow', authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+// API endpoint to fetch vote data based on year and roll_no
+app.post('/api/votecheck', async(req, res) => {
+    const { year, roll_no } = req.body;
+
+    try {
+        // Query to fetch election_id from election table based on year
+        const electionQuery = `
+            SELECT election_id
+            FROM election
+            WHERE year = ?
+        `;
+
+        // Execute the query to fetch election_id
+        const [electionRows] = await pool.execute(electionQuery, [year]);
+
+        if (electionRows.length === 0) {
+            throw new Error('No election found for the given year');
+        }
+
+        const electionId = electionRows[0].election_id;
+
+        // Query to fetch vote table data based on election_id and roll_no
+        const voteQuery = `
+            SELECT *
+            FROM vote
+            WHERE election_id = ? AND voter_roll_no = ?
+        `;
+
+        // Execute the query to fetch vote table data
+        const [voteRows] = await pool.execute(voteQuery, [electionId, roll_no]);
+
+        // Send the response with vote table data
+        res.json(voteRows);
+
+    } catch (error) {
+        console.error('Error fetching vote data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 
 
 // Route for voting
