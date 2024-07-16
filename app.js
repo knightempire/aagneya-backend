@@ -1798,7 +1798,7 @@ app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
 
 // Admin Add Achievement without Token Authentication
 app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
-    let { description, achievement_name, name, achievement_date, roll_no, is_team ,sport_id} = req.body;
+    let { description, achievement_name, name, achievement_date, roll_no, is_team, sport_id } = req.body;
     console.log('API adminaddachievement requested');
     console.log('Request Body:', req.body);
     // Convert necessary fields to lowercase
@@ -1843,7 +1843,7 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
 
 
         await pool.execute(insertQuery, [
-            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1,sport_id
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1, sport_id
         ]);
 
 
@@ -1869,7 +1869,7 @@ app.get('/api/displayachievements', async(req, res) => {
     }
 });
 //display pending achievements
-app.get('/api/displayachievementspending', async (req, res) => {
+app.get('/api/displayachievementspending', async(req, res) => {
     try {
         console.log('API displayachievements requested');
 
@@ -2043,15 +2043,24 @@ app.post('/api/electionaddyear', [authenticateToken, async(req, res) => {
             // Calculate the new year to be added
             const newYear = maxYear ? maxYear + 1 : new Date().getFullYear(); // Default to current year if no years exist
 
-            // Insert new election year with is_register = 0 and is_vote = 0
-            const insertQuery = 'INSERT INTO election (year, is_register, is_vote) VALUES (?, 0, 0)';
-            const [insertResult] = await pool.execute(insertQuery, [newYear]);
+            // Check if the current year is already complete (is_vote == 2)
+            const checkIsVoteQuery = 'SELECT is_vote FROM election WHERE year = ?';
+            const [checkIsVoteResult] = await pool.execute(checkIsVoteQuery, [maxYear]);
 
-            // Retrieve the auto-generated election_id from the insert result
-            const election_id = insertResult.insertId;
+            if (checkIsVoteResult.length > 0 && checkIsVoteResult[0].is_vote === 2) {
+                // Insert new election year with is_register = 0 and is_vote = 0
+                const insertQuery = 'INSERT INTO election (year, is_register, is_vote) VALUES (?, 0, 0)';
+                const [insertResult] = await pool.execute(insertQuery, [newYear]);
 
-            // Send a response indicating success
-            res.json({ success: true, election_id, year: newYear, message: 'New election year added' });
+                // Retrieve the auto-generated election_id from the insert result
+                const election_id = insertResult.insertId;
+
+                // Send a response indicating success
+                res.json({ success: true, election_id, year: newYear, message: 'New election year added' });
+            } else {
+                // Send an error response indicating that the current year is not complete
+                res.status(400).json({ error: 'Current election year results are not finalized. Cannot add a new year yet.' });
+            }
         }
     } catch (error) {
         console.error('Error fetching or adding election year data:', error);
@@ -2251,6 +2260,135 @@ app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
 
     } catch (error) {
         console.error('Error updating voting status for election:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
+    const { year } = req.body;
+
+    try {
+        console.log('API electionroleppl requested');
+
+        // Fetch election data based on year
+        const fetchElectionQuery = 'SELECT * FROM election WHERE year = ?';
+        const [electionRows] = await pool.execute(fetchElectionQuery, [year]);
+
+        // Check if election data exists for the given year
+        if (electionRows.length === 0) {
+            return res.status(404).json({ error: 'Election not found for the given year' });
+        }
+
+        const { election_id, is_register, is_vote } = electionRows[0];
+
+        // Check if is_reg and is_vote are not 2
+        if (is_register !== 2 && is_vote !== 2) {
+            // Fetch candidate data based on election_id
+            const fetchCandidateQuery = 'SELECT * FROM candidate WHERE election_id = ?';
+            const [candidateRows] = await pool.execute(fetchCandidateQuery, [election_id]);
+
+            // Separate candidates into boys and girls arrays based on gender
+            const boys = [];
+            const girls = [];
+
+            // Fetch profile data for each candidate
+            for (let candidate of candidateRows) {
+                const fetchProfileQuery = 'SELECT * FROM profile WHERE roll_no = ?';
+                const [profileRows] = await pool.execute(fetchProfileQuery, [candidate.reg_roll_no]);
+
+                if (profileRows.length > 0) {
+                    const profileData = profileRows[0];
+                    if (candidate.gender === 'Boys') {
+                        boys.push({...candidate, profile: profileData });
+                    } else if (candidate.gender === 'Girls') {
+                        girls.push({...candidate, profile: profileData });
+                    }
+                }
+            }
+
+            // Return arrays with gender-specific candidates including profile data
+            res.json({ success: true, boys, girls });
+        } else {
+            // If is_reg or is_vote is 2, send an appropriate message
+            res.json({ success: true, message: 'No candidate data available for this election due to election status.' });
+        }
+
+    } catch (error) {
+        console.error('Error fetching election role people:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+// API route for checking candidate registration status
+app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
+    try {
+        console.log('API publish check requested');
+
+        // Extract year from the request body
+        const { year } = req.body;
+
+        // Query to fetch candidate counts by role and gender
+        const candidateCheckQuery = `
+            SELECT
+                r.role_id,
+                r.role_name,
+                genders.gender,
+                COALESCE(c.candidate_count, 0) AS candidate_count
+            FROM
+                (SELECT 1 AS role_id UNION SELECT 2 UNION SELECT 3 UNION SELECT 4) AS r
+                CROSS JOIN (SELECT 'Boys' AS gender UNION SELECT 'Girls') AS genders
+                LEFT JOIN (
+                    SELECT
+                        role_id,
+                        gender,
+                        COUNT(*) AS candidate_count
+                    FROM
+                        candidate
+                    WHERE
+                        election_id IN (SELECT election_id FROM election WHERE year = ?)
+                    GROUP BY
+                        role_id,
+                        gender
+                ) AS c ON r.role_id = c.role_id AND genders.gender = c.gender
+        `;
+
+        // Execute the query
+        const [candidateCheckResult] = await pool.execute(candidateCheckQuery, [year]);
+
+        // Prepare response data
+        const categoryStatus = [];
+
+        // Map query results to categoryStatus
+        candidateCheckResult.forEach(row => {
+            categoryStatus.push({
+                role_name: row.role_name,
+                gender: row.gender,
+                registered: row.candidate_count > 0
+            });
+        });
+
+        // Separate into exits and missing categories
+        const exits = categoryStatus.filter(status => status.registered);
+        const missing = categoryStatus.filter(status => !status.registered);
+
+        // Determine the check status
+        const check = missing.length === 0 ? 1 : 0;
+
+        // Prepare the response message
+        let message = '';
+        if (missing.length === 0) {
+            message = 'All categories have registered candidates.';
+        } else {
+            message = 'Categories without candidates:';
+        }
+
+        // Send the response with check status included
+        res.json({ message, exits, missing, check });
+
+    } catch (error) {
+        console.error('Error checking publish status:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
