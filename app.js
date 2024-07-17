@@ -2097,7 +2097,7 @@ app.post('/api/electioncreate', [authenticateToken, async(req, res) => {
 }]);
 
 
-app.post('/api/electionstatus', [authenticateToken, async(req, res) => {
+app.post('/api/votestatus', [authenticateToken, async(req, res) => {
     const { year } = req.body; // Get year from request body
 
     if (!year) {
@@ -2223,10 +2223,7 @@ app.post('/api/electionvotestatus', [authenticateToken, async(req, res) => {
             return res.status(400).json({ error: 'Cannot open voting because registration is already open.' });
         }
 
-        // Check if trying to open voting when it is already open
-        if (status === 1 && currentVoteStatus === 1) {
-            return res.status(400).json({ error: 'Voting is already open.' });
-        }
+
 
         // Check if trying to open voting when it is open for another year
         if (status === 1) {
@@ -2282,12 +2279,14 @@ app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
         const { election_id, is_reg, is_vote } = electionRows[0];
 
         // Determine election status based on is_vote and is_reg
-        let electionstatus = 0; // Default to 0
+        let votestatus = 0; // Default to 0
 
         if (is_vote === 1) {
-            electionstatus = 1; // Set electionstatus to 1 if is_vote is 1
-        } else if (is_reg === 2) {
-            electionstatus = 2; // Set electionstatus to 2 if is_reg is 2
+            votestatus = 1; // Set votestatus to 1 if is_vote is 1
+        } else if (is_vote === 0) {
+            votestatus = 0; // Set votestatus to 2 if is_reg is 2
+        } else if (is_vote === 2) {
+            votestatus = 2;
         }
 
         // Fetch candidate data based on election_id
@@ -2314,7 +2313,7 @@ app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
         }
 
         // Return arrays with gender-specific candidates including profile data and election status
-        res.json({ success: true, boys, girls, electionstatus });
+        res.json({ success: true, boys, girls, votestatus });
 
     } catch (error) {
         console.error('Error fetching election role people:', error);
@@ -2325,7 +2324,7 @@ app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
 
 
 // API route for checking candidate registration status
-app.post('/api/publishcheck', [authenticateToken, async (req, res) => {
+app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
     try {
         console.log('API publish check requested');
 
@@ -2366,7 +2365,7 @@ app.post('/api/publishcheck', [authenticateToken, async (req, res) => {
         // Map query results to categoryStatus
         candidateCheckResult.forEach(row => {
             categoryStatus.push({
-                role_id: row.role_id,  // Include role_id for filtering
+                role_id: row.role_id, // Include role_id for filtering
                 role_name: row.role_name,
                 gender: row.gender,
                 registered: row.candidate_count > 0
@@ -2474,7 +2473,8 @@ app.post('/api/votecheck', async(req, res) => {
     const { year, roll_no } = req.body;
 
     try {
-        // Query to fetch election_id from election table based on year
+        console.log("api votecheck requested")
+            // Query to fetch election_id from election table based on year
         const electionQuery = `
             SELECT election_id
             FROM election
@@ -2511,51 +2511,79 @@ app.post('/api/votecheck', async(req, res) => {
 
 
 
-// Route for voting
+// Route for handling votes in the election
 app.post('/api/vote', [authenticateToken, async(req, res) => {
-    const { election_id, role_id, roll_no, candidate_id, gender } = req.body;
+    const { year, role_id, roll_no, candidate_id } = req.body;
 
     try {
-        console.log('API vote requested');
-
-        // Convert roll_no to lowercase
-        const voter_roll_no = roll_no.toLowerCase();
-
-        // Check if the election is still open for voting
-        const checkElectionQuery = 'SELECT is_vote FROM election WHERE election_id = ?';
-        const [electionResult] = await pool.execute(checkElectionQuery, [election_id]);
-
-        // Verify if the election exists and is open for voting
-        if (electionResult.length === 0) {
-            return res.status(404).json({ error: 'Election not found' });
+        console.log(req.body)
+        console.log("api vote requested")
+            // Step 1: Get election_id from election table based on year
+        const electionQuery = `
+            SELECT election_id, is_vote
+            FROM election
+            WHERE year = ?
+        `;
+        const [electionResults] = await pool.execute(electionQuery, [year]);
+        console.log(electionResults)
+        if (electionResults.length === 0) {
+            return res.status(404).json({ error: 'Election not found for the given year' });
         }
 
-        const { is_vote } = electionResult[0];
+        const { election_id, is_vote } = electionResults[0];
 
+        console.log(is_vote)
+            // Step 2: Check if voting is closed
         if (is_vote !== 1) {
             return res.status(400).json({ error: 'Voting for this election is closed' });
         }
 
-        // Check if the voter has already voted in this election and role for the given gender
-        const checkVoteQuery = 'SELECT * FROM vote WHERE election_id = ? AND role_id = ? AND voter_roll_no = ? AND gender = ?';
-        const [existingVotes] = await pool.execute(checkVoteQuery, [election_id, role_id, voter_roll_no, gender]);
-
-        // If a vote already exists, return an error
-        if (existingVotes.length > 0) {
-            return res.status(400).json({ error: 'You have already voted for this election and role' });
+        // Step 4: Get candidate details
+        const candidateQuery = `
+              SELECT reg_roll_no, role_id, gender
+              FROM candidate
+              WHERE candidate_id = ?
+          `;
+        const [candidateResults] = await pool.execute(candidateQuery, [candidate_id]);
+        console.log
+        if (candidateResults.length === 0) {
+            return res.status(404).json({ error: 'Candidate not found' });
         }
 
-        // Insert into the vote table
-        const insertQuery = 'INSERT INTO vote (election_id, role_id, voter_roll_no, candidate_id, gender) VALUES (?, ?, ?, ?, ?)';
-        const [result] = await pool.execute(insertQuery, [election_id, role_id, voter_roll_no, candidate_id, gender]);
+        const { reg_roll_no, candidate_role_id, gender } = candidateResults[0];
 
-        res.json({ success: true, message: 'Vote recorded successfully' });
+
+        // Log gender to console
+        console.log('Candidate Gender:', gender);
+
+
+        // Step 3: Check if the voter has already voted for this role and gender
+        const voteCheckQuery = `
+            SELECT COUNT(*) AS voteCount
+            FROM vote
+            WHERE role_id = ? AND gender = ? AND voter_roll_no = ?
+        `;
+        const [voteCheckResults] = await pool.execute(voteCheckQuery, [role_id, gender, roll_no]);
+
+        if (voteCheckResults[0].voteCount > 0) {
+            return res.status(400).json({ error: 'You have already voted for this role and gender' });
+        }
+
+
+        // Step 5: Insert the vote into the vote table
+        const insertVoteQuery = `
+            INSERT INTO vote (election_id, role_id, voter_roll_no, candidate_id, gender)
+            VALUES (?, ?, ?, ?, ?)
+        `;
+        await pool.execute(insertVoteQuery, [election_id, role_id, roll_no, candidate_id, gender]);
+
+        res.json({ success: true, message: 'Vote cast successfully' });
+
     } catch (error) {
-        console.error('Error recording vote:', error);
+        console.error('Error casting vote:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
-
 
 
 
