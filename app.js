@@ -2325,7 +2325,7 @@ app.post('/api/electionroleppl', [authenticateToken, async(req, res) => {
 
 
 // API route for checking candidate registration status
-app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
+app.post('/api/publishcheck', [authenticateToken, async (req, res) => {
     try {
         console.log('API publish check requested');
 
@@ -2366,6 +2366,7 @@ app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
         // Map query results to categoryStatus
         candidateCheckResult.forEach(row => {
             categoryStatus.push({
+                role_id: row.role_id,  // Include role_id for filtering
                 role_name: row.role_name,
                 gender: row.gender,
                 registered: row.candidate_count > 0
@@ -2374,7 +2375,7 @@ app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
 
         // Separate into exits and missing categories
         const exits = categoryStatus.filter(status => status.registered);
-        const missing = categoryStatus.filter(status => !status.registered);
+        const missing = categoryStatus.filter(status => !status.registered && ![0, 5, 6].includes(status.role_id));
 
         // Determine the check status
         const check = missing.length === 0 ? 1 : 0;
@@ -2395,6 +2396,7 @@ app.post('/api/publishcheck', [authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
 
 
 
