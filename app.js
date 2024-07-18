@@ -2449,7 +2449,23 @@ app.post('/api/electionregister', [authenticateToken, async(req, res) => {
 }]);
 
 
-
+app.post('/api/electionstatus', [authenticateToken, async(req, res) => {
+    const { year } = req.body; // Get year from request body
+    if (!year) {
+        return res.status(400).json({ error: 'Year is required' });
+    }
+    try {
+        const query = 'SELECT * FROM election WHERE year = ?';
+        const [rows] = await pool.execute(query, [year]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Election year not found' });
+        }
+        res.json({ success: true, data: rows[0] });
+    } catch (error) {
+        console.error('Error fetching election status:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
 
 app.get('/api/electionshow', authenticateToken, async(req, res) => {
     try {
