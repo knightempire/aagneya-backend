@@ -2916,6 +2916,142 @@ app.post('/api/viewvoteresult', [authenticateToken, async(req, res) => {
     }
 }]);
 
+
+app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
+    const { year } = req.body;
+
+    try {
+        console.log('API winnerelectionresult requested');
+        if (!year) {
+            return res.status(400).json({ error: 'Year is required in the request body' });
+        }
+
+        // Query to get election_id based on the provided year
+        const electionIdQuery = 'SELECT election_id FROM election WHERE year = ?';
+        const [electionIdResult] = await pool.execute(electionIdQuery, [year]);
+
+        // Check if election exists for the provided year
+        if (electionIdResult.length === 0) {
+            return res.status(404).json({ error: 'No election found for the provided year' });
+        }
+
+        const { election_id } = electionIdResult[0];
+
+        // Query to get vote results for all role_ids and sorted by role_id
+        const voteResultQuery = `
+            SELECT v.role_id, v.candidate_id, c.reg_roll_no, c.gender, COUNT(*) as vote_count
+            FROM vote v
+            INNER JOIN candidate c ON v.candidate_id = c.candidate_id
+            WHERE v.election_id = ?
+            GROUP BY v.role_id, v.candidate_id, c.gender
+            ORDER BY v.role_id, c.gender
+        `;
+
+        const [voteResults] = await pool.execute(voteResultQuery, [election_id]);
+
+        if (voteResults.length === 0) {
+            return res.status(404).json({ error: 'No vote results found for this election' });
+        }
+
+        // Query to fetch roles information
+        const rolesQuery = 'SELECT role_id, role_name FROM roles';
+        const [roles] = await pool.execute(rolesQuery);
+
+        // Map roles to role_id for quick lookup
+        const roleMap = {};
+        roles.forEach(role => {
+            roleMap[role.role_id] = role.role_name;
+        });
+
+        // Calculate total votes for each role_id and gender in the election
+        const totalVotesQuery = `
+            SELECT role_id, gender, COUNT(*) as total_votes
+            FROM vote
+            WHERE election_id = ?
+            GROUP BY role_id, gender
+        `;
+        const [totalVotesResults] = await pool.execute(totalVotesQuery, [election_id]);
+
+        // Map the total votes to a role_id and gender indexed object
+        const totalVotesMap = {};
+        totalVotesResults.forEach(result => {
+            if (!totalVotesMap[result.role_id]) {
+                totalVotesMap[result.role_id] = {};
+            }
+            totalVotesMap[result.role_id][result.gender] = result.total_votes;
+        });
+
+        // Identify winners for each role and gender
+        const winners = {};
+
+        voteResults.forEach(result => {
+            const { role_id, gender, vote_count, reg_roll_no } = result;
+            const totalVotesGender = totalVotesMap[role_id][gender];
+            const votePercentage = totalVotesGender > 0 ? (vote_count / totalVotesGender) * 100 : 0;
+
+            if (!winners[role_id]) {
+                winners[role_id] = {};
+            }
+
+            if (!winners[role_id][gender]) {
+                winners[role_id][gender] = {
+                    reg_roll_no: reg_roll_no,
+                    vote_count: vote_count,
+                    vote_percentage: votePercentage,
+                    name: '', // Placeholder for name retrieval
+                    role_name: roleMap[role_id] || 'Unknown Role',
+                    gender: gender
+                };
+            } else {
+                // Compare and update if current candidate has more votes
+                if (vote_count > winners[role_id][gender].vote_count) {
+                    winners[role_id][gender] = {
+                        reg_roll_no: reg_roll_no,
+                        vote_count: vote_count,
+                        vote_percentage: votePercentage,
+                        name: '', // Placeholder for name retrieval
+                        role_name: roleMap[role_id] || 'Unknown Role',
+                        gender: gender
+                    };
+                }
+            }
+        });
+
+        // Query to fetch profiles and map roll_no to names
+        const rollNos = Object.values(winners).flatMap(role => Object.values(role).map(winner => winner.reg_roll_no));
+        const profilesQuery = 'SELECT roll_no, name FROM profile WHERE roll_no IN (?)';
+        const [profiles] = await pool.execute(profilesQuery, [rollNos]);
+
+        // Map roll_no to names for quick lookup
+        const nameMap = {};
+        profiles.forEach(profile => {
+            nameMap[profile.roll_no] = profile.name;
+        });
+
+        // Assign names to winners
+        Object.keys(winners).forEach(role_id => {
+            Object.keys(winners[role_id]).forEach(gender => {
+                winners[role_id][gender].name = nameMap[winners[role_id][gender].reg_roll_no] || 'Unknown';
+            });
+        });
+
+        // Format the winners into the required structure
+        const formattedWinners = Object.keys(winners).map(role_id => ({
+            role_id: role_id,
+            role_name: roleMap[role_id] || 'Unknown Role',
+            gender: Object.values(winners[role_id])
+        }));
+
+        // Return the formatted winners sorted by role_id
+        res.json({ success: true, winners: formattedWinners });
+
+    } catch (error) {
+        console.error('Error fetching winner results:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
 // Route for updating SPL roles in the login table
 app.post('/api/updatingsplroles', [authenticateToken, async(req, res) => {
     const { roll_no, role_id } = req.body;
