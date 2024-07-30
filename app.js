@@ -2929,8 +2929,6 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
         const electionIdQuery = 'SELECT election_id FROM election WHERE year = ?';
         const [electionIdResult] = await pool.execute(electionIdQuery, [year]);
 
-        console.log('Election ID result:', electionIdResult);
-
         if (electionIdResult.length === 0) {
             return res.status(404).json({ error: 'No election found for the provided year' });
         }
@@ -2949,8 +2947,6 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
 
         const [voteResults] = await pool.execute(voteResultQuery, [election_id]);
 
-        console.log('Vote results:', voteResults);
-
         if (voteResults.length === 0) {
             return res.status(404).json({ error: 'No vote results found for this election' });
         }
@@ -2958,8 +2954,6 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
         // Query to fetch roles information
         const rolesQuery = 'SELECT role_id, role_name FROM roles';
         const [roles] = await pool.execute(rolesQuery);
-
-        console.log('Roles:', roles);
 
         const roleMap = {};
         roles.forEach(role => {
@@ -2974,8 +2968,6 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
             GROUP BY role_id, gender
         `;
         const [totalVotesResults] = await pool.execute(totalVotesQuery, [election_id]);
-
-        console.log('Total votes results:', totalVotesResults);
 
         const totalVotesMap = {};
         totalVotesResults.forEach(result => {
@@ -3018,28 +3010,29 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
             }
         });
 
-        console.log('Winners before name and photo path assignment:', winners);
-
-        // Query to fetch profiles and map roll_no to names and photo_paths
+        // Fetch profiles one by one
+        const profileMap = {};
         const rollNos = Object.values(winners).flatMap(role => Object.values(role).map(winner => winner.reg_roll_no));
         console.log('Roll Nos to fetch profiles:', rollNos);
 
         if (rollNos.length === 0) {
             console.log('No roll numbers found to fetch profiles.');
+        } else {
+            for (const roll_no of rollNos) {
+                console.log(`Fetching profile for roll_no: ${roll_no}`);
+                const profileQuery = 'SELECT roll_no, name, photo_path FROM profile WHERE roll_no = ?';
+                const [profile] = await pool.execute(profileQuery, [roll_no]);
+
+                console.log(`Profile result for roll_no ${roll_no}:`, profile);
+
+                if (profile.length > 0) {
+                    const { name, photo_path } = profile[0];
+                    profileMap[roll_no] = { name, photo_path };
+                } else {
+                    profileMap[roll_no] = { name: 'Unknown', photo_path: 'Unknown' };
+                }
+            }
         }
-
-        const profilesQuery = 'SELECT roll_no, name, photo_path FROM profile WHERE roll_no IN (?)';
-        const [profiles] = await pool.execute(profilesQuery, [rollNos]);
-
-        console.log('Profiles:', profiles);
-
-        const profileMap = {};
-        profiles.forEach(profile => {
-            profileMap[profile.roll_no] = {
-                name: profile.name,
-                photo_path: profile.photo_path
-            };
-        });
 
         console.log('Profile Map:', profileMap);
 
@@ -3074,6 +3067,8 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
+
+
 
 
 // Route for updating SPL roles in the login table
