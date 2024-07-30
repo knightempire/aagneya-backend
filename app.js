@@ -2916,8 +2916,6 @@ app.post('/api/viewvoteresult', [authenticateToken, async(req, res) => {
     }
 }]);
 
-
-
 app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
     const { year } = req.body;
 
@@ -2933,7 +2931,6 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
 
         console.log('Election ID result:', electionIdResult);
 
-        // Check if election exists for the provided year
         if (electionIdResult.length === 0) {
             return res.status(404).json({ error: 'No election found for the provided year' });
         }
@@ -2941,14 +2938,14 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
         const { election_id } = electionIdResult[0];
 
         // Query to get vote results for all role_ids and sorted by role_id
-        const voteResultQuery =
-            SELECT v.role_id,
-            v.candidate_id, c.reg_roll_no, c.gender, COUNT( * ) as vote_count
-        FROM vote v
-        INNER JOIN candidate c ON v.candidate_id = c.candidate_id
-        WHERE v.election_id = ?
+        const voteResultQuery = `
+            SELECT v.role_id, v.candidate_id, c.reg_roll_no, c.gender, COUNT(*) as vote_count
+            FROM vote v
+            INNER JOIN candidate c ON v.candidate_id = c.candidate_id
+            WHERE v.election_id = ?
             GROUP BY v.role_id, v.candidate_id, c.gender
-        ORDER BY v.role_id, c.gender;
+            ORDER BY v.role_id, c.gender
+        `;
 
         const [voteResults] = await pool.execute(voteResultQuery, [election_id]);
 
@@ -2964,24 +2961,22 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
 
         console.log('Roles:', roles);
 
-        // Map roles to role_id for quick lookup
         const roleMap = {};
         roles.forEach(role => {
             roleMap[role.role_id] = role.role_name;
         });
 
         // Calculate total votes for each role_id and gender in the election
-        const totalVotesQuery =
-            SELECT role_id,
-            gender, COUNT( * ) as total_votes
-        FROM vote
-        WHERE election_id = ?
-            GROUP BY role_id, gender;
+        const totalVotesQuery = `
+            SELECT role_id, gender, COUNT(*) as total_votes
+            FROM vote
+            WHERE election_id = ?
+            GROUP BY role_id, gender
+        `;
         const [totalVotesResults] = await pool.execute(totalVotesQuery, [election_id]);
 
         console.log('Total votes results:', totalVotesResults);
 
-        // Map the total votes to a role_id and gender indexed object
         const totalVotesMap = {};
         totalVotesResults.forEach(result => {
             if (!totalVotesMap[result.role_id]) {
@@ -3007,20 +3002,15 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
                     reg_roll_no: reg_roll_no,
                     vote_count: vote_count,
                     vote_percentage: votePercentage,
-                    name: '', // Placeholder for name retrieval
-                    photo_path: '', // Placeholder for photo path retrieval
                     role_name: roleMap[role_id] || 'Unknown Role',
                     gender: gender
                 };
             } else {
-                // Compare and update if current candidate has more votes
                 if (vote_count > winners[role_id][gender].vote_count) {
                     winners[role_id][gender] = {
                         reg_roll_no: reg_roll_no,
                         vote_count: vote_count,
                         vote_percentage: votePercentage,
-                        name: '', // Placeholder for name retrieval
-                        photo_path: '', // Placeholder for photo path retrieval
                         role_name: roleMap[role_id] || 'Unknown Role',
                         gender: gender
                     };
@@ -3032,12 +3022,17 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
 
         // Query to fetch profiles and map roll_no to names and photo_paths
         const rollNos = Object.values(winners).flatMap(role => Object.values(role).map(winner => winner.reg_roll_no));
+        console.log('Roll Nos to fetch profiles:', rollNos);
+
+        if (rollNos.length === 0) {
+            console.log('No roll numbers found to fetch profiles.');
+        }
+
         const profilesQuery = 'SELECT roll_no, name, photo_path FROM profile WHERE roll_no IN (?)';
         const [profiles] = await pool.execute(profilesQuery, [rollNos]);
 
         console.log('Profiles:', profiles);
 
-        // Map roll_no to names and photo_paths for quick lookup
         const profileMap = {};
         profiles.forEach(profile => {
             profileMap[profile.roll_no] = {
@@ -3045,6 +3040,8 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
                 photo_path: profile.photo_path
             };
         });
+
+        console.log('Profile Map:', profileMap);
 
         // Assign names and photo_paths to winners
         Object.keys(winners).forEach(role_id => {
@@ -3062,34 +3059,21 @@ app.post('/api/winnerelectionresult', [authenticateToken, async(req, res) => {
         const formattedWinners = Object.keys(winners).map(role_id => ({
             role_id: role_id,
             role_name: roleMap[role_id] || 'Unknown Role',
-            gender: Object.values(winners[role_id])
-        }));
-
-        console.log('Formatted winners:', formattedWinners);
-
-        // Further reformat the output to include role_id and role_name within each gender
-        const finalOutput = Object.keys(winners).map(role_id => ({
-            role_id: role_id,
-            role_name: roleMap[role_id] || 'Unknown Role',
             gender: Object.keys(winners[role_id]).map(gender => ({
                 gender: gender,
                 ...winners[role_id][gender]
             }))
         }));
 
-        console.log('Final output:', finalOutput);
+        console.log('Formatted winners:', formattedWinners);
 
-        res.json({ success: true, winners: finalOutput });
+        res.json({ success: true, winners: formattedWinners });
 
     } catch (error) {
         console.error('Error fetching winner results:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
-
-
-
-
 
 
 // Route for updating SPL roles in the login table
