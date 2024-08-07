@@ -1101,7 +1101,7 @@ app.post('/api/adminaddevent', authenticateToken, async(req, res) => {
 
 
 // API endpoint for displaying approved event
-app.get('/api/displayevent', [authenticateToken, async(req, res) => {
+app.get('/api/displayevent', async(req, res) => {
     try {
         console.log('API displayevent requested');
 
@@ -1121,7 +1121,7 @@ app.get('/api/displayevent', [authenticateToken, async(req, res) => {
         console.error('Error displaying event:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
 // API endpoint for displaying approved events by sport_name
@@ -3164,7 +3164,7 @@ app.get('/images', (req, res) => {
 
 
 app.get('/test', (req, res) => {
-    res.status(200).json({ message: "Welcome buddy" });
+    res.status(200).json({ message: "Welcome Aagneya" });
 });
 
 
