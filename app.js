@@ -427,7 +427,7 @@ app.post('/api/addsports', [authenticateToken, async(req, res) => {
 }]);
 
 // API endpoint for displaying sports data
-app.get('/api/displaysports', [authenticateToken, async(req, res) => {
+app.get('/api/displaysports', async(req, res) => {
     try {
         console.log('API displaysports requested');
 
@@ -441,7 +441,7 @@ app.get('/api/displaysports', [authenticateToken, async(req, res) => {
         console.error('Error displaying sports data:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
-}]);
+});
 
 
 // Route for adding security information
@@ -1125,7 +1125,7 @@ app.get('/api/displayevent', async(req, res) => {
 
 
 // API endpoint for displaying approved events by sport_name
-app.post('/api/displayeventsport', authenticateToken, async(req, res) => {
+app.post('/api/displayeventsport', async(req, res) => {
     try {
         const { sport_name } = req.body;
         console.log('API displayevent requested');
