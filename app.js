@@ -1852,12 +1852,17 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
     }
 });
 
-// Display Approved Achievements
-app.get('/api/displayachievements', async(req, res) => {
+app.get('/api/displayachievements', async (req, res) => {
     try {
         console.log('API displayachievements requested');
 
-        const selectQuery = 'SELECT * FROM achievement WHERE is_display = ?';
+        // Modify the query to join with the sports table and select the sport_name
+        const selectQuery = `
+            SELECT a.*, s.sport_name 
+            FROM achievement a
+            LEFT JOIN sports s ON a.sport_id = s.sport_id
+            WHERE a.is_display = ?`;
+
         const [achievements] = await pool.execute(selectQuery, [1]);
 
         res.json({ success: true, achievements });
@@ -1866,6 +1871,7 @@ app.get('/api/displayachievements', async(req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 //display pending achievements
 app.get('/api/displayachievementspending', async(req, res) => {
     try {
