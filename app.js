@@ -1852,6 +1852,63 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
     }
 });
 
+
+// Admin edit achievement without Token Authentication
+app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+    console.log('Middleware passed, entering route handler');
+    let { id, description, achievement_name, name, achievement_date, roll_no, is_team, sport_id } = req.body;
+    console.log('API updateachievement requested');
+    console.log('Request Body:', req.body);
+
+    // Convert necessary fields to lowercase
+    name = name.toLowerCase();
+    description = description.toLowerCase();
+
+    // Handle roll_no parsing gracefully
+    let parsedRollNo;
+    try {
+        parsedRollNo = JSON.parse(roll_no); // Attempt to parse roll_no
+        if (!Array.isArray(parsedRollNo)) {
+            throw new Error('roll_no is not an array');
+        }
+        // Convert each item to lowercase
+        parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
+    } catch (error) {
+        return res.status(400).json({ error: 'Invalid roll_no format' });
+    }
+
+    try {
+        // Extract uploaded file paths
+        const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
+        const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
+
+        // Update existing achievement in the achievement table based on ID
+        const updateQuery = `
+            UPDATE achievement 
+            SET 
+                description = ?, 
+                achievement_name = ?, 
+                name = ?, 
+                achievement_date = ?, 
+                roll_no = ?, 
+                photo_path = COALESCE(?, photo_path), 
+                certificate_path = COALESCE(?, certificate_path), 
+                is_team = ?, 
+                sport_id = ?
+            WHERE id = ?`;
+
+        await pool.execute(updateQuery, [
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), photo_path, certificate_path, is_team, sport_id, id
+        ]);
+
+        res.json({ success: true, message: 'Achievement updated successfully' });
+    } catch (error) {
+        console.error('Error updating achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 app.get('/api/displayachievements', async (req, res) => {
     try {
         console.log('API displayachievements requested');
@@ -1911,97 +1968,6 @@ app.post('/api/createdachievements', [authenticateToken, async(req, res) => {
     }
 }]);
 
-// Update Achievement
-app.post('/api/updateachievement', [authenticateToken, async(req, res) => {
-    const { achievement_id, description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
-
-    try {
-        console.log('API updateachievement requested');
-
-        // Check if the achievement exists and its current is_display status
-        const [achievementRows] = await pool.execute('SELECT is_display FROM achievement WHERE achievement_id = ?', [achievement_id]);
-
-        if (achievementRows.length === 0) {
-            return res.status(404).json({ error: 'Achievement not found' });
-        }
-
-        const isDisplay = achievementRows[0].is_display;
-
-        // Check if the achievement is already displayed
-        if (isDisplay === 1) {
-            return res.status(403).json({ error: 'Achievement is already published and cannot be edited' });
-        }
-
-        // Update the achievement
-        const updateQuery = `
-            UPDATE achievement 
-            SET 
-                description = ?, 
-                achievement_date = ?, 
-                roll_no = ?, 
-                name = ?, 
-                photo_path = ?, 
-                is_team = ?, 
-                is_inside_campus = ? 
-            WHERE 
-                achievement_id = ?`;
-
-        await pool.execute(updateQuery, [
-            description,
-            achievement_date,
-            roll_no.toLowerCase(),
-            name.toLowerCase(),
-            photo_path,
-            is_team,
-            is_inside_campus,
-            achievement_id
-        ]);
-
-        res.json({ success: true, message: 'Achievement updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}]);
-
-// Admin Update Achievement
-app.post('/api/adminupdateachievement', [authenticateToken, async(req, res) => {
-    const { achievement_id, description, achievement_date, roll_no, name, photo_path, is_team, is_inside_campus } = req.body;
-
-    try {
-        console.log('API adminupdateachievement requested');
-
-        // Update the achievement in the database
-        const updateQuery = `
-            UPDATE achievement 
-            SET 
-                description = ?, 
-                achievement_date = ?, 
-                roll_no = ?, 
-                name = ?, 
-                photo_path = ?, 
-                is_team = ?, 
-                is_inside_campus = ? 
-            WHERE 
-                achievement_id = ?`;
-
-        await pool.execute(updateQuery, [
-            description,
-            achievement_date,
-            roll_no.toLowerCase(),
-            name.toLowerCase(),
-            photo_path,
-            is_team,
-            is_inside_campus,
-            achievement_id
-        ]);
-
-        res.json({ success: true, message: 'Achievement updated successfully' });
-    } catch (error) {
-        console.error('Error updating achievement:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-}]);
 
 
 // API route for showing election years
