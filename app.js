@@ -1895,7 +1895,7 @@ app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 
                 certificate_path = COALESCE(?, certificate_path), 
                 is_team = ?, 
                 sport_id = ?
-            WHERE id = ?`;
+            WHERE achievement_id = ?`;
 
         await pool.execute(updateQuery, [
             description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), photo_path, certificate_path, is_team, sport_id, id
@@ -1908,6 +1908,21 @@ app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 
     }
 });
 
+app.post('/api/admindeactivateachievement', async (req, res) => {
+    const { achievement_id } = req.body;
+    console.log('API admindeactivateachievement requested');
+
+    try {
+        // Update the achievement to set is_display to 0
+        const updateQuery = 'UPDATE achievement SET is_display = ? WHERE achievement_id = ?';
+        await pool.execute(updateQuery, [0, achievement_id]);
+
+        res.json({ success: true, message: 'Achievement deactivated successfully' });
+    } catch (error) {
+        console.error('Error deactivating achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 app.get('/api/displayachievements', async (req, res) => {
     try {
