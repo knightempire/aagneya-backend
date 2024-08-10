@@ -734,6 +734,7 @@ app.post('/api/activateuser', [authenticateToken, async(req, res) => {
     }
 }]);
 
+
 app.put('/api/updateuser', async(req, res) => {
     let { roll_no, sport_id, role_id, gender, year } = req.body;
 
@@ -1923,6 +1924,23 @@ app.post('/api/admindeactivateachievement', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
+app.post('/api/adminactivateachievement', async (req, res) => {
+    const { achievement_id } = req.body;
+    console.log('API adminactivateachievement requested');
+
+    try {
+        // Update the achievement to set is_display to 1 (or whatever value signifies active)
+        const updateQuery = 'UPDATE achievement SET is_display = ? WHERE achievement_id = ?';
+        await pool.execute(updateQuery, [1, achievement_id]);
+
+        res.json({ success: true, message: 'Achievement activated successfully' });
+    } catch (error) {
+        console.error('Error activating achievement:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 
 app.get('/api/displayachievements', async (req, res) => {
     try {
