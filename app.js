@@ -741,6 +741,7 @@ app.post('/api/updateuser', async(req, res) => {
     // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
 
+
     try {
         console.log('API updateusers requested');
 
