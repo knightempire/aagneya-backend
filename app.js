@@ -1855,7 +1855,7 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
 
 
 // Admin edit achievement without Token Authentication
-app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async (req, res) => {
+app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
     console.log('Middleware passed, entering route handler');
     let { id, description, achievement_name, name, achievement_date, roll_no, is_team, sport_id } = req.body;
     console.log('API updateachievement requested');
@@ -1909,7 +1909,7 @@ app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 
     }
 });
 
-app.post('/api/admindeactivateachievement', async (req, res) => {
+app.post('/api/admindeactivateachievement', async(req, res) => {
     const { achievement_id } = req.body;
     console.log('API admindeactivateachievement requested');
 
@@ -1925,7 +1925,7 @@ app.post('/api/admindeactivateachievement', async (req, res) => {
     }
 });
 
-app.post('/api/adminactivateachievement', async (req, res) => {
+app.post('/api/adminactivateachievement', async(req, res) => {
     const { achievement_id } = req.body;
     console.log('API adminactivateachievement requested');
 
@@ -1942,7 +1942,7 @@ app.post('/api/adminactivateachievement', async (req, res) => {
 });
 
 
-app.get('/api/displayachievements', async (req, res) => {
+app.get('/api/displayachievements', async(req, res) => {
     try {
         console.log('API displayachievements requested');
 
@@ -3109,6 +3109,47 @@ app.post('/api/updatingsplroles', [authenticateToken, async(req, res) => {
 
 
 
+const deleteNonTxtFiles = (directoryPath, res) => {
+    fs.readdir(directoryPath, (err, files) => {
+        if (err) {
+            console.error(`Error reading directory ${directoryPath}:`, err);
+            return res.status(500).json({ error: `Error reading directory ${directoryPath}` });
+        }
+
+        // Filter out files that do not end with .txt
+        const nonTxtFiles = files.filter(file => path.extname(file).toLowerCase() !== '.txt');
+
+        if (nonTxtFiles.length === 0) {
+            console.log(`No non-txt files found in ${directoryPath}`);
+            return res.json({ message: `No non-txt files found in ${directoryPath}` });
+        }
+
+        // Delete non-txt files
+        nonTxtFiles.forEach(file => {
+            const filePath = path.join(directoryPath, file);
+            fs.unlink(filePath, err => {
+                if (err) {
+                    console.error(`Error deleting file ${file} in ${directoryPath}:`, err);
+                } else {
+                    console.log(`Deleted file: ${file} in ${directoryPath}`);
+                }
+            });
+        });
+
+        // Respond after all deletions are done
+        res.json({ message: `Non-txt files deleted successfully in ${directoryPath}` });
+    });
+};
+
+// DELETE endpoint to remove non-.txt files from both 'uploads' and 'pdf' directories
+app.delete('/api/delete-non-txt', (req, res) => {
+    const uploadsFolder = path.join(__dirname, 'uploads');
+    const pdfFolder = path.join(__dirname, 'pdf');
+
+    // Delete non-txt files from both directories
+    deleteNonTxtFiles(uploadsFolder, res);
+    deleteNonTxtFiles(pdfFolder, res);
+});
 
 
 
