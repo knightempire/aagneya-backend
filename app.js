@@ -735,7 +735,7 @@ app.post('/api/activateuser', [authenticateToken, async(req, res) => {
 }]);
 
 
-app.put('/api/updateuser', async(req, res) => {
+app.post('/api/updateuser', async(req, res) => {
     let { roll_no, sport_id, role_id, gender, year } = req.body;
 
     // Convert roll_no to lowercase
