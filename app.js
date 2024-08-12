@@ -8,7 +8,7 @@ const cookieParser = require('cookie-parser');
 const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
-
+const fs = require('fs');
 
 
 const app = express();
@@ -3109,48 +3109,68 @@ app.post('/api/updatingsplroles', [authenticateToken, async(req, res) => {
 
 
 
-const deleteNonTxtFiles = (directoryPath, res) => {
-    fs.readdir(directoryPath, (err, files) => {
-        if (err) {
-            console.error(`Error reading directory ${directoryPath}:`, err);
-            return res.status(500).json({ error: `Error reading directory ${directoryPath}` });
-        }
+// Function to delete non-`.txt` files from a given directory
+const deleteNonTxtFiles = (directoryPath) => {
+    return new Promise((resolve, reject) => {
+        fs.readdir(directoryPath, (err, files) => {
+            if (err) {
+                return reject(`Error reading directory ${directoryPath}: ${err.message}`);
+            }
 
-        // Filter out files that do not end with .txt
-        const nonTxtFiles = files.filter(file => path.extname(file).toLowerCase() !== '.txt');
+            // Filter out files that do not end with .txt
+            const nonTxtFiles = files.filter(file => path.extname(file).toLowerCase() !== '.txt');
 
-        if (nonTxtFiles.length === 0) {
-            console.log(`No non-txt files found in ${directoryPath}`);
-            return res.json({ message: `No non-txt files found in ${directoryPath}` });
-        }
+            if (nonTxtFiles.length === 0) {
+                console.log(`No non-txt files found in ${directoryPath}`);
+                return resolve(`No non-txt files found in ${directoryPath}`);
+            }
 
-        // Delete non-txt files
-        nonTxtFiles.forEach(file => {
-            const filePath = path.join(directoryPath, file);
-            fs.unlink(filePath, err => {
-                if (err) {
-                    console.error(`Error deleting file ${file} in ${directoryPath}:`, err);
-                } else {
-                    console.log(`Deleted file: ${file} in ${directoryPath}`);
-                }
+            // Delete non-txt files
+            let deletionPromises = nonTxtFiles.map(file => {
+                return new Promise((fileResolve, fileReject) => {
+                    const filePath = path.join(directoryPath, file);
+                    fs.unlink(filePath, err => {
+                        if (err) {
+                            console.error(`Error deleting file ${file} in ${directoryPath}:`, err);
+                            fileReject(`Error deleting file ${file} in ${directoryPath}`);
+                        } else {
+                            console.log(`Deleted file: ${file} in ${directoryPath}`);
+                            fileResolve();
+                        }
+                    });
+                });
             });
-        });
 
-        // Respond after all deletions are done
-        res.json({ message: `Non-txt files deleted successfully in ${directoryPath}` });
+            // Wait for all deletions to complete
+            Promise.all(deletionPromises)
+                .then(() => resolve(`Non-txt files deleted successfully in ${directoryPath}`))
+                .catch(error => reject(error));
+        });
     });
 };
 
 // DELETE endpoint to remove non-.txt files from both 'uploads' and 'pdf' directories
-app.delete('/api/delete-non-txt', (req, res) => {
-    const uploadsFolder = path.join(__dirname, 'uploads');
-    const pdfFolder = path.join(__dirname, 'pdf');
+app.delete('/api/delete-non-txt', async(req, res) => {
+    try {
+        const uploadsFolder = path.join(__dirname, 'uploads');
+        const pdfFolder = path.join(__dirname, 'pdf');
 
-    // Delete non-txt files from both directories
-    deleteNonTxtFiles(uploadsFolder, res);
-    deleteNonTxtFiles(pdfFolder, res);
+        // Delete non-txt files from both directories
+        let messages = [];
+
+        const uploadsResult = await deleteNonTxtFiles(uploadsFolder);
+        messages.push(uploadsResult);
+
+        const pdfResult = await deleteNonTxtFiles(pdfFolder);
+        messages.push(pdfResult);
+
+        // Respond with the success messages
+        res.json({ message: messages.join(', ') });
+    } catch (error) {
+        console.error('Error during file deletion:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
 });
-
 
 
 
