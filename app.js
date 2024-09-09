@@ -9,9 +9,14 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { google } = require("googleapis");
+const stream = require("stream");
+
 
 
 const app = express();
+const upload = multer();
+
 const port = 3000 || null;
 
 
@@ -53,84 +58,124 @@ const dbConfig = {
 // Create a MySQL pool
 const pool = mysql.createPool(dbConfig);
 
+
+
+
+
 // Serve uploaded images statically
-app.use('/uploads', express.static('./uploads'));
-app.use('/pdf', express.static('./pdf'));
+// app.use('/uploads', express.static('./uploads'));
+// app.use('/pdf', express.static('./pdf'));
 
 
 
 // Multer middleware setup
-const storage = multer.diskStorage({
-    destination: function(req, file, cb) {
-        cb(null, 'uploads');
-    },
-    filename: function(req, file, cb) {
-        cb(null, 'img_' + Date.now() + path.extname(file.originalname));
-    }
-});
+// const storage = multer.diskStorage({
+//     destination: function(req, file, cb) {
+//         cb(null, 'uploads');
+//     },
+//     filename: function(req, file, cb) {
+//         cb(null, 'img_' + Date.now() + path.extname(file.originalname));
+//     }
+// });
 
-const upload = multer({
-    storage: storage,
-    fileFilter: function(req, file, cb) {
-        // Check if the file is an image
-        if (!file.mimetype.startsWith('image/')) {
-            return cb(new Error('Only images are allowed.'));
-        }
-        cb(null, true);
-    }
-});
+// const upload = multer({
+//     storage: storage,
+//     fileFilter: function(req, file, cb) {
+//         // Check if the file is an image
+//         if (!file.mimetype.startsWith('image/')) {
+//             return cb(new Error('Only images are allowed.'));
+//         }
+//         cb(null, true);
+//     }
+// });
 
 // Multer middleware setup for PDFs
-const pdfStorage = multer.diskStorage({
-    destination: function(req, file, cb) {
-        cb(null, 'pdf'); // Directory where uploaded PDF files will be stored
-    },
-    filename: function(req, file, cb) {
-        cb(null, 'doc_' + Date.now() + path.extname(file.originalname)); // Rename the PDF file if needed
-    }
-});
+// const pdfStorage = multer.diskStorage({
+//     destination: function(req, file, cb) {
+//         cb(null, 'pdf'); // Directory where uploaded PDF files will be stored
+//     },
+//     filename: function(req, file, cb) {
+//         cb(null, 'doc_' + Date.now() + path.extname(file.originalname)); // Rename the PDF file if needed
+//     }
+// });
 
-const uploadPdf = multer({
-    storage: pdfStorage,
-    fileFilter: function(req, file, cb) {
-        // Check if the file is a PDF
-        if (!file.mimetype.startsWith('application/pdf')) {
-            return cb(new Error('Only PDF files are allowed.'));
-        }
-        cb(null, true);
-    }
-});
+// const uploadPdf = multer({
+//     storage: pdfStorage,
+//     fileFilter: function(req, file, cb) {
+//         // Check if the file is a PDF
+//         if (!file.mimetype.startsWith('application/pdf')) {
+//             return cb(new Error('Only PDF files are allowed.'));
+//         }
+//         cb(null, true);
+//     }
+// });
 
 
 // Multer middleware setup for images and PDFs
-const storage1 = multer.diskStorage({
-    destination: function(req, file, cb) {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, 'uploads');
-        } else if (file.mimetype.startsWith('application/pdf')) {
-            cb(null, 'pdf');
-        }
-    },
-    filename: function(req, file, cb) {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, 'img_' + Date.now() + path.extname(file.originalname));
-        } else if (file.mimetype.startsWith('application/pdf')) {
-            cb(null, 'doc_' + Date.now() + path.extname(file.originalname));
-        }
-    }
+// const storage1 = multer.diskStorage({
+//     destination: function(req, file, cb) {
+//         if (file.mimetype.startsWith('image/')) {
+//             cb(null, 'uploads');
+//         } else if (file.mimetype.startsWith('application/pdf')) {
+//             cb(null, 'pdf');
+//         }
+//     },
+//     filename: function(req, file, cb) {
+//         if (file.mimetype.startsWith('image/')) {
+//             cb(null, 'img_' + Date.now() + path.extname(file.originalname));
+//         } else if (file.mimetype.startsWith('application/pdf')) {
+//             cb(null, 'doc_' + Date.now() + path.extname(file.originalname));
+//         }
+//     }
+// });
+
+// const upload1 = multer({
+//     storage: storage1,
+//     fileFilter: function(req, file, cb) {
+//         if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('application/pdf')) {
+//             return cb(new Error('Only images and PDFs are allowed.'));
+//         }
+//         cb(null, true);
+//     }
+// });
+
+
+
+const KEYFILEPATH = path.join(__dirname, "cred.json");
+const SCOPES = ["https://www.googleapis.com/auth/drive"];
+
+
+const auth = new google.auth.GoogleAuth({
+    keyFile: KEYFILEPATH,
+    scopes: SCOPES,
 });
 
-const upload1 = multer({
-    storage: storage1,
-    fileFilter: function(req, file, cb) {
-        if (!file.mimetype.startsWith('image/') && !file.mimetype.startsWith('application/pdf')) {
-            return cb(new Error('Only images and PDFs are allowed.'));
-        }
-        cb(null, true);
-    }
-});
 
+const uploadFile = async(fileObject, name) => {
+    const bufferStream = new stream.PassThrough();
+    bufferStream.end(fileObject.buffer);
 
+    const fileExtension = path.extname(fileObject.originalname);
+    const fileName = `${name}${fileExtension}`;
+
+    const { data } = await google.drive({ version: "v3", auth }).files.create({
+        media: {
+            mimeType: fileObject.mimetype,
+            body: bufferStream,
+        },
+        requestBody: {
+            name: fileName,
+            parents: ["1NOS8Xy8QZq7YPPRzNLSgEhJH4NmV9vwd"], // Replace with your folder ID
+        },
+        fields: "id,name",
+    });
+
+    const url = `https://drive.google.com/file/d/${data.id}/view`;
+    console.log(`Uploaded file ${data.name} ${data.id}`);
+    console.log(`URL: ${url}`);
+
+    return url;
+};
 
 
 // Session middleware configuration
@@ -480,57 +525,106 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
 
 
 
+// app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
+//     let { roll_no, name, email, phone, date, sport_name } = req.body;
+//     roll_no = roll_no.toLowerCase();
+
+//     try {
+//         if (!req.file) {
+//             throw new Error('No photo uploaded.');
+//         }
+
+//         console.log("API addprofile requested");
+//         const fileUploadResponse = await uploadFileToGoogleDrive(req.file, name);
+//         const filePath = fileUploadResponse.id; // Store file ID from Google Drive
+
+//         const updateQuery = `
+//             UPDATE profile
+//             SET name = ?,
+//                 photo_path = ?,
+//                 email = ?,
+//                 phone = ?
+//             WHERE roll_no = ?
+//         `;
+
+//         const [result] = await pool.execute(updateQuery, [name, filePath, email, phone, roll_no]);
+
+//         const qaCheckQuery = `
+//             SELECT * FROM qa
+//             WHERE roll_no = ?
+//         `;
+//         const [qaRows] = await pool.execute(qaCheckQuery, [roll_no]);
+
+//         if (qaRows.length === 0) {
+//             const insertQAQuery = `
+//                 INSERT INTO qa (roll_no, dob)
+//                 VALUES (?, ?)
+//             `;
+//             await pool.execute(insertQAQuery, [roll_no, date]);
+//             console.log("Data inserted into QA table");
+//         }
+
+//         console.log("Profile updated successfully");
+//         res.status(200).json({ success: true, message: "Profile added/updated successfully" });
+//     } catch (error) {
+//         console.error("Error adding/updating profile: ", error);
+//         res.status(500).json({ error: "Error adding/updating profile." });
+//     }
+// }]);
+
+// API endpoint for verifying roll number and date of birth
+
+
+
 app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
     let { roll_no, name, email, phone, date, sport_name } = req.body;
-
-    // Convert roll_no to lowercase
     roll_no = roll_no.toLowerCase();
 
     try {
-        // Check if photo was uploaded
-        console.log("api addprofile requested")
         if (!req.file) {
             throw new Error('No photo uploaded.');
         }
 
-        let path = req.file.path;
-        console.log("Uploaded file path:", path);
+        console.log("API addprofile requested");
+        const fileUploadResponse = await uploadFile(req.file, name);
+        const filePath = fileUploadResponse.id; // Store file ID from Google Drive
 
         const updateQuery = `
-        UPDATE profile
-        SET name = ?,
-            photo_path = ?,
-            email = ?,
-            phone = ?
-        WHERE roll_no = ?
-    `;
+            UPDATE profile
+            SET name = ?,
+                photo_path = ?,
+                email = ?,
+                phone = ?
+            WHERE roll_no = ?
+        `;
 
-        const [result, fields2] = await pool.execute(updateQuery, [name, path, email, phone, roll_no]);
+        const [result] = await pool.execute(updateQuery, [name, filePath, email, phone, roll_no]);
+
         const qaCheckQuery = `
-        SELECT * FROM qa
-        WHERE roll_no = ?
-    `;
-        const [qaRows, qaFields] = await pool.execute(qaCheckQuery, [roll_no]);
+            SELECT * FROM qa
+            WHERE roll_no = ?
+        `;
+        const [qaRows] = await pool.execute(qaCheckQuery, [roll_no]);
 
         if (qaRows.length === 0) {
-            // Insert into qa table if roll_no does not exist
             const insertQAQuery = `
-            INSERT INTO qa (roll_no, dob)
-            VALUES (?, ?)
-        `;
+                INSERT INTO qa (roll_no, dob)
+                VALUES (?, ?)
+            `;
             await pool.execute(insertQAQuery, [roll_no, date]);
             console.log("Data inserted into QA table");
         }
 
-        console.log("Data inserted successfully");
-        res.status(200).json({ success: true, message: "Profile added successfully" });
+        console.log("Profile updated successfully");
+        res.status(200).json({ success: true, message: "Profile added/updated successfully" });
     } catch (error) {
-        console.error("Error adding profile: ", error);
-        res.status(500).json({ error: "Error adding profile." });
+        console.error("Error adding/updating profile: ", error);
+        res.status(500).json({ error: "Error adding/updating profile." });
     }
 }]);
 
-// API endpoint for verifying roll number and date of birth
+
+
 app.post('/api/verifyroleno', async(req, res) => {
     let { roll_no, dob } = req.body;
 
@@ -1714,14 +1808,14 @@ app.post('/api/adminupdateblog', [authenticateToken, async(req, res) => {
 
 
 //add achievement
-app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
+
+
+app.post('/api/addachievement', [authenticateToken, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
     let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
 
     // Convert necessary fields to lowercase
     name = name.toLowerCase();
     description = description.toLowerCase();
-
-
 
     // Handle roll_no parsing gracefully
     let parsedRollNo;
@@ -1732,9 +1826,7 @@ app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'ima
         }
         // Convert each item to lowercase
         parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
-
     } catch (error) {
-
         return res.status(400).json({ error: 'Invalid roll_no format' });
     }
 
@@ -1742,12 +1834,9 @@ app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'ima
     const location = null;
 
     try {
-
-
-        // Extract uploaded file paths
-        const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
-        const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
-
+        // Upload files to Google Drive and get their IDs
+        const imageFileId = req.files && req.files['image'] ? await uploadFile(req.files['image'][0], name) : null;
+        const pdfFileId = req.files && req.files['pdf'] ? await uploadFile(req.files['pdf'][0], name) : null;
 
         // Insert new achievement into the achievement table
         const insertQuery = `
@@ -1755,22 +1844,76 @@ app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'ima
             (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-
-
         await pool.execute(insertQuery, [
-            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 0
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, imageFileId, pdfFileId, is_team, 0, 0
         ]);
-
 
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-
+        console.error('Error adding achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }]);
 
 
+// app.post('/api/addachievement', [authenticateToken, upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
+//     let { description, achievement_name, name, achievement_date, roll_no, is_team } = req.body;
+
+//     // Convert necessary fields to lowercase
+//     name = name.toLowerCase();
+//     description = description.toLowerCase();
+
+
+
+//     // Handle roll_no parsing gracefully
+//     let parsedRollNo;
+//     try {
+//         parsedRollNo = JSON.parse(roll_no); // Attempt to parse roll_no
+//         if (!Array.isArray(parsedRollNo)) {
+//             throw new Error('roll_no is not an array');
+//         }
+//         // Convert each item to lowercase
+//         parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
+
+//     } catch (error) {
+
+//         return res.status(400).json({ error: 'Invalid roll_no format' });
+//     }
+
+//     // Set location to null
+//     const location = null;
+
+//     try {
+
+
+//         // Extract uploaded file paths
+//         const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
+//         const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
+
+
+//         // Insert new achievement into the achievement table
+//         const insertQuery = `
+//             INSERT INTO achievement 
+//             (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display) 
+//             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+
+
+//         await pool.execute(insertQuery, [
+//             description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 0
+//         ]);
+
+
+//         res.json({ success: true, message: 'Achievement added successfully' });
+//     } catch (error) {
+
+//         res.status(500).json({ error: 'Internal Server Error' });
+//     }
+// }]);
+
 // Achievement Approval
+
+
 app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
     const { achievement_id } = req.body;
 
@@ -1797,15 +1940,16 @@ app.post('/api/achievementapproval', [authenticateToken, async(req, res) => {
 
 
 // Admin Add Achievement without Token Authentication
-app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
+
+
+app.post('/api/adminaddachievement', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
     let { description, achievement_name, name, achievement_date, roll_no, is_team, sport_id } = req.body;
     console.log('API adminaddachievement requested');
     console.log('Request Body:', req.body);
+
     // Convert necessary fields to lowercase
     name = name.toLowerCase();
     description = description.toLowerCase();
-
-
 
     // Handle roll_no parsing gracefully
     let parsedRollNo;
@@ -1816,9 +1960,7 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
         }
         // Convert each item to lowercase
         parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
-
     } catch (error) {
-
         return res.status(400).json({ error: 'Invalid roll_no format' });
     }
 
@@ -1826,37 +1968,91 @@ app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 
     const location = null;
 
     try {
-
-
-        // Extract uploaded file paths
-        const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
-        const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
-
-
+        // Upload files to Google Drive and get their IDs
+        const imageFileId = req.files && req.files['image'] ? await uploadFile(req.files['image'][0], name) : null;
+        const pdfFileId = req.files && req.files['pdf'] ? await uploadFile(req.files['pdf'][0], name) : null;
 
         // Insert new achievement into the achievement table
         const insertQuery = `
             INSERT INTO achievement 
-            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display,sport_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`;
-
-
+            (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display, sport_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         await pool.execute(insertQuery, [
-            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1, sport_id
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, imageFileId, pdfFileId, is_team, 0, 1, sport_id
         ]);
-
 
         res.json({ success: true, message: 'Achievement added successfully' });
     } catch (error) {
-
+        console.error('Error adding achievement:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
+// app.post('/api/adminaddachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
+//     let { description, achievement_name, name, achievement_date, roll_no, is_team, sport_id } = req.body;
+//     console.log('API adminaddachievement requested');
+//     console.log('Request Body:', req.body);
+//     // Convert necessary fields to lowercase
+//     name = name.toLowerCase();
+//     description = description.toLowerCase();
+
+
+
+//     // Handle roll_no parsing gracefully
+//     let parsedRollNo;
+//     try {
+//         parsedRollNo = JSON.parse(roll_no); // Attempt to parse roll_no
+//         if (!Array.isArray(parsedRollNo)) {
+//             throw new Error('roll_no is not an array');
+//         }
+//         // Convert each item to lowercase
+//         parsedRollNo = parsedRollNo.map(r => r.toLowerCase());
+
+//     } catch (error) {
+
+//         return res.status(400).json({ error: 'Invalid roll_no format' });
+//     }
+
+//     // Set location to null
+//     const location = null;
+
+//     try {
+
+
+//         // Extract uploaded file paths
+//         const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
+//         const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
+
+
+
+//         // Insert new achievement into the achievement table
+//         const insertQuery = `
+//             INSERT INTO achievement 
+//             (description, achievement_name, name, achievement_date, roll_no, location, photo_path, certificate_path, is_team, is_inside_campus, is_display,sport_id) 
+//             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`;
+
+
+
+//         await pool.execute(insertQuery, [
+//             description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), location, photo_path, certificate_path, is_team, 0, 1, sport_id
+//         ]);
+
+
+//         res.json({ success: true, message: 'Achievement added successfully' });
+//     } catch (error) {
+
+//         res.status(500).json({ error: 'Internal Server Error' });
+//     }
+// });
+
+
 
 // Admin edit achievement without Token Authentication
-app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
+
+
+
+app.post('/api/updateachievement', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]), async(req, res) => {
     console.log('Middleware passed, entering route handler');
     let { id, description, achievement_name, name, achievement_date, roll_no, is_team, sport_id } = req.body;
     console.log('API updateachievement requested');
@@ -1880,9 +2076,9 @@ app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 
     }
 
     try {
-        // Extract uploaded file paths
-        const photo_path = req.files && req.files['image'] ? req.files['image'][0].path : null; // Image path
-        const certificate_path = req.files && req.files['pdf'] ? req.files['pdf'][0].path : null; // PDF path
+        // Upload files to Google Drive and get their IDs
+        const imageFileId = req.files && req.files['image'] ? await uploadFile(req.files['image'][0], name) : null;
+        const pdfFileId = req.files && req.files['pdf'] ? await uploadFile(req.files['pdf'][0], name) : null;
 
         // Update existing achievement in the achievement table based on ID
         const updateQuery = `
@@ -1900,7 +2096,7 @@ app.post('/api/updateachievement', upload1.fields([{ name: 'image', maxCount: 1 
             WHERE achievement_id = ?`;
 
         await pool.execute(updateQuery, [
-            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), photo_path, certificate_path, is_team, sport_id, id
+            description, achievement_name, name, achievement_date, JSON.stringify(parsedRollNo), imageFileId, pdfFileId, is_team, sport_id, id
         ]);
 
         res.json({ success: true, message: 'Achievement updated successfully' });
