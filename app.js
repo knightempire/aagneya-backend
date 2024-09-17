@@ -3365,7 +3365,7 @@ app.post('/api/intramatches', [authenticateToken, async(req, res) => {
 
         // Check if a match with the same gender, sport_id, and year already exists
         const checkQuery = `
-            SELECT match_id 
+            SELECT m_id 
             FROM matches 
             WHERE sport_id = ? AND year = ? AND gender = ?
         `;
