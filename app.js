@@ -3346,6 +3346,169 @@ const deleteNonTxtFiles = (directoryPath) => {
     });
 };
 
+
+
+
+// intra macthes
+
+// API route for creating a new intramatch with gender
+app.post('/api/intramatches', [authenticateToken, async(req, res) => {
+    const { sport_id, house1, house2, house3, house4, date_time, year, gender } = req.body;
+
+    try {
+        console.log('API intramatches requested');
+
+        // Validate required fields
+        if (!sport_id || !house1 || !house2 || !house3 || !house4 || !date_time || !year || !gender) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // Check if a match with the same gender, sport_id, and year already exists
+        const checkQuery = `
+            SELECT match_id 
+            FROM matches 
+            WHERE sport_id = ? AND year = ? AND gender = ?
+        `;
+        const [existingMatches] = await pool.execute(checkQuery, [sport_id, year, gender]);
+
+        if (existingMatches.length > 0) {
+            return res.status(400).json({ error: 'A match in a year with same gender already exists' });
+        }
+
+        // Insert new match into the matches table with gender
+        const insertQuery = `
+            INSERT INTO matches (sport_id, house1, house2, house3, house4, date_time, year, gender) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const [insertResult] = await pool.execute(insertQuery, [sport_id, house1, house2, house3, house4, date_time, year, gender]);
+
+        // Retrieve the auto-generated match_id from the insert result
+        const match_id = insertResult.insertId;
+
+        res.json({ success: true, match_id, message: 'New match inserted successfully' });
+    } catch (error) {
+        console.error('Error creating intramatch:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+
+// API route for displaying intramatches by year
+app.post('/api/displayintramatches', async(req, res) => {
+    const { year } = req.body;
+
+    try {
+        console.log('API displayintramatches requested');
+
+        // Validate that the year is provided
+        if (!year) {
+            return res.status(400).json({ error: 'Year is required' });
+        }
+
+        // Query to select matches and join with sports table
+        const query = `
+            SELECT 
+                m.match_id,
+                m.sport_id,
+                s.sport_name,
+                m.house1,
+                m.house2,
+                m.house3,
+                m.house4,
+                m.date_time,
+                m.year
+            FROM 
+                matches m
+            JOIN 
+                sports s ON m.sport_id = s.sport_id
+            WHERE 
+                m.year = ?
+        `;
+
+        const [results] = await pool.execute(query, [year]);
+
+        // Check if matches were found
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'No matches found for the specified year' });
+        }
+
+        res.json({ success: true, matches: results });
+    } catch (error) {
+        console.error('Error displaying intramatches:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+
+// API route for inserting intrapoints with gender, sports_id, and year
+app.post('/api/intrapoints', [authenticateToken, async(req, res) => {
+    const { gender, sports_id, year, amritamayi, anandmayi, chinmayi, jyotirmayi } = req.body;
+
+    try {
+        console.log('API intrapoints requested');
+
+        // Validate required fields
+        if (!gender || !sports_id || !year || amritamayi === undefined || anandmayi === undefined || chinmayi === undefined || jyotirmayi === undefined) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // Find the m_id from the matches table
+        const findMatchQuery = `
+            SELECT match_id 
+            FROM matches 
+            WHERE gender = ? AND sport_id = ? AND year = ?
+        `;
+        const [matchRows] = await pool.execute(findMatchQuery, [gender, sports_id, year]);
+
+        if (matchRows.length === 0) {
+            return res.status(404).json({ error: 'No matching match found' });
+        }
+
+        // Retrieve the m_id (assuming the match_id is what you need)
+        const m_id = matchRows[0].match_id;
+
+        // Insert new points into the points table
+        const insertQuery = `
+            INSERT INTO points (m_id, amritamayi, anandmayi, chinmayi, jyotirmayi)
+            VALUES (?, ?, ?, ?, ?)
+        `;
+        const [insertResult] = await pool.execute(insertQuery, [m_id, amritamayi, anandmayi, chinmayi, jyotirmayi]);
+
+        // Retrieve the auto-generated points_id from the insert result
+        const points_id = insertResult.insertId;
+
+        res.json({ success: true, points_id, message: 'Points data inserted successfully' });
+    } catch (error) {
+        console.error('Error inserting intrapoints:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // DELETE endpoint to remove non-.txt files from both 'uploads' and 'pdf' directories
 app.delete('/api/delete-non-txt', async(req, res) => {
     try {
