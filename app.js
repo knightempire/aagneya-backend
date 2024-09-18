@@ -3442,6 +3442,48 @@ app.post('/api/displayintramatches', async(req, res) => {
 
 
 
+// API route for displaying intramatches by year
+app.get('/api/displayallintramatches', async(req, res) => {
+
+
+    try {
+        console.log('API displayintramatches requested');
+
+        // Validate that the year is provided
+        if (!year) {
+            return res.status(400).json({ error: 'Year is required' });
+        }
+
+        // Query to select matches and join with sports table
+        const query = `
+            SELECT 
+                m.match_id,
+                s.sport_name,
+                m.house1,
+                m.house2,
+                m.house3,
+                m.house4,
+                m.date_time,
+                m.year,
+                m.gender
+            FROM 
+                matches m
+            JOIN 
+                sports s ON m.sport_id = s.sport_id
+        `;
+
+        const [results] = await pool.execute(query, [year]);
+
+
+
+        res.json({ success: true, matches: results });
+    } catch (error) {
+        console.error('Error displaying intramatches:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 // API route for inserting intrapoints with gender, sports_id, and year
 app.post('/api/intrapoints', [authenticateToken, async(req, res) => {
     const { gender, sports_id, year, amritamayi, anandmayi, chinmayi, jyotirmayi } = req.body;
