@@ -3449,10 +3449,6 @@ app.get('/api/displayallintramatches', async(req, res) => {
     try {
         console.log('API displayintramatches requested');
 
-        // Validate that the year is provided
-        if (!year) {
-            return res.status(400).json({ error: 'Year is required' });
-        }
 
         // Query to select matches and join with sports table
         const query = `
