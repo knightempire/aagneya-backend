@@ -3453,7 +3453,7 @@ app.get('/api/displayallintramatches', async(req, res) => {
         // Query to select matches and join with sports table
         const query = `
             SELECT 
-                m.match_id,
+                m.m_id,
                 s.sport_name,
                 m.house1,
                 m.house2,
