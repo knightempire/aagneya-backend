@@ -3468,7 +3468,7 @@ app.get('/api/displayallintramatches', async(req, res) => {
                 sports s ON m.sport_id = s.sport_id
         `;
 
-        const [results] = await pool.execute(query, [year]);
+        const [results] = await pool.execute(query);
 
 
 
