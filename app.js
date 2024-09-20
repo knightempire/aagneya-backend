@@ -141,7 +141,7 @@ const pool = mysql.createPool(dbConfig);
 
 
 
-const KEYFILEPATH = path.join(__dirname, "cred.json");
+const KEYFILEPATH = path.join(__dirname, "./cred.json");
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
 
 
