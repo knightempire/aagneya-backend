@@ -577,18 +577,24 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
 
 
 app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
+    console.log("API addprofile requested");
+    console.log("Received data:", req.body);
+    console.log("Uploaded file:", req.file);
+
     let { roll_no, name, email, phone, date, sport_name } = req.body;
     roll_no = roll_no.toLowerCase();
 
     try {
+        // Check if an image was uploaded
         if (!req.file) {
             throw new Error('No photo uploaded.');
         }
 
-        console.log("API addprofile requested");
+        // Upload file and get the file path
         const fileUploadResponse = await uploadFile(req.file, name);
         const filePath = fileUploadResponse.id; // Store file ID from Google Drive
 
+        // Update profile in the database
         const updateQuery = `
             UPDATE profile
             SET name = ?,
@@ -599,13 +605,16 @@ app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(re
         `;
 
         const [result] = await pool.execute(updateQuery, [name, filePath, email, phone, roll_no]);
+        console.log("Update result:", result);
 
+        // Check if there's a QA record for the roll number
         const qaCheckQuery = `
             SELECT * FROM qa
             WHERE roll_no = ?
         `;
         const [qaRows] = await pool.execute(qaCheckQuery, [roll_no]);
 
+        // Insert QA record if it doesn't exist
         if (qaRows.length === 0) {
             const insertQAQuery = `
                 INSERT INTO qa (roll_no, dob)
@@ -618,7 +627,7 @@ app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(re
         console.log("Profile updated successfully");
         res.status(200).json({ success: true, message: "Profile added/updated successfully" });
     } catch (error) {
-        console.error("Error adding/updating profile: ", error);
+        console.error("Error adding/updating profile: ", error.stack);
         res.status(500).json({ error: "Error adding/updating profile." });
     }
 }]);
