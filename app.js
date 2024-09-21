@@ -24,6 +24,7 @@ app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -576,7 +577,7 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
 
 
 
-app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
+app.post('/api/addprofile', [authenticateToken, upload.any(), async(req, res) => {
     console.log("API addprofile requested");
     console.log("Received data:", req.body);
     console.log("Uploaded file:", req.file);
