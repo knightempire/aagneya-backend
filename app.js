@@ -15,7 +15,8 @@ const stream = require("stream");
 
 
 const app = express();
-const upload = multer();
+const upload = multer({ storage: multer.memoryStorage() });
+
 
 const port = 3000 || null;
 
@@ -577,7 +578,7 @@ app.post('/api/addsecurity', [authenticateToken, async(req, res) => {
 
 
 
-app.post('/api/addprofile', [authenticateToken, upload.any(), async(req, res) => {
+app.post('/api/addprofile', [authenticateToken, upload.single('image'), async(req, res) => {
     console.log("API addprofile requested");
     console.log("Received data:", req.body);
     console.log("Uploaded file:", req.file);
